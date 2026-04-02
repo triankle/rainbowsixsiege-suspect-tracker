@@ -1,4 +1,4 @@
-/* Variables pour garder un thème cohérent type R6 / militaire */
+/* R6-style dark theme */
 :root {
   --bg-dark: #0f1419;
   --bg-card: #1a2332;
@@ -90,7 +90,7 @@ h2 {
   color: var(--text-muted);
 }
 
-/* Formulaire */
+/* Form */
 .form-section {
   background-color: var(--bg-card);
   padding: 1.5rem;
@@ -141,6 +141,67 @@ h2 {
   flex: 1;
 }
 
+.hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.hint code {
+  font-size: 0.85em;
+  color: var(--accent-dim);
+}
+
+.form-error {
+  background: rgba(248, 81, 73, 0.12);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.form-error.hidden {
+  display: none;
+}
+
+.seasons-fieldset {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-dark);
+}
+
+.seasons-fieldset legend {
+  padding: 0 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.season-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.season-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.season-item input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
 button[type="submit"] {
   width: 100%;
   margin-top: 0.5rem;
@@ -159,7 +220,7 @@ button[type="submit"]:hover {
   background-color: var(--accent-dim);
 }
 
-/* Résultat */
+/* Result */
 .result-section {
   background-color: var(--bg-card);
   padding: 1.5rem;
