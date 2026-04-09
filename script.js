@@ -347,3 +347,30 @@ form.addEventListener('submit', function (e) {
 });
 
 buildSeasonCheckboxes();
+
+/** Low-volume ambience (autoplay blocked — user must use the toggle). */
+(function initAmbienceAudio() {
+  const audio = document.getElementById('bg-audio');
+  const toggle = document.getElementById('audio-toggle');
+  if (!audio || !toggle) return;
+
+  const LOW_VOLUME = 0.14;
+  audio.volume = LOW_VOLUME;
+
+  function setPlaying(playing) {
+    toggle.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    toggle.textContent = playing ? '♪ On' : '♪ Ambience';
+  }
+
+  toggle.addEventListener('click', () => {
+    if (audio.paused) {
+      audio.volume = LOW_VOLUME;
+      audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  });
+
+  audio.addEventListener('ended', () => setPlaying(false));
+})();

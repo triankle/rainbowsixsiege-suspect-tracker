@@ -4,13 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>R6 Suspect Check — Ranked profile helper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>R6 Suspect Check</h1>
+  <div class="atmosphere" aria-hidden="true">
+    <div class="atmosphere__grain"></div>
+    <div class="atmosphere__scanlines"></div>
+    <div class="atmosphere__vignette"></div>
+  </div>
+
+  <header class="masthead">
+    <p class="masthead__kicker">Ranked vetting · not evidence</p>
+    <h1 class="masthead__title">R6 Suspect Check</h1>
     <p class="tagline">Ranked-only stats from R6 Tracker — for discussion / vetting, not proof</p>
-    <nav>
+    <nav class="masthead__nav">
       <a href="https://r6.tracker.network/r6siege/profile/ubi/" target="_blank" rel="noopener">Open R6 Tracker</a>
     </nav>
   </header>
@@ -84,9 +94,16 @@
     </section>
   </main>
 
-  <footer>
+  <footer class="site-footer">
     <p>Data from <a href="https://r6.tracker.network/r6siege/profile/ubi/" target="_blank" rel="noopener">r6.tracker.network</a>. Indicative only — not evidence of cheating.</p>
   </footer>
+
+  <audio id="bg-audio" loop preload="metadata" playsinline>
+    <source src="Tokyo%20Reggie.mp3" type="audio/mpeg">
+  </audio>
+  <button type="button" id="audio-toggle" class="audio-toggle" aria-pressed="false" title="Musique d’ambiance (faible volume) — clic pour lancer">
+    ♪ Ambience
+  </button>
 
   <script src="script.js"></script>
 </body>
