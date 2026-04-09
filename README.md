@@ -1,13 +1,5 @@
 # R6 Suspect Check
-
-Petit site web pour estimer si un profil Rainbow Six Siege est **suspect (triche)** ou **type smurf**, à partir des stats qu’on peut voir sur [R6 Tracker](https://r6.tracker.network/r6siege/profile/ubi/).
-
-## Utilisation
-
-1. Ouvre le profil du joueur sur **r6.tracker.network**.
-2. Ouvre `index.html` dans ton navigateur (double-clic ou serveur local).
-3. Renseigne les champs avec les stats du profil (K/D, parties, classé, niveau, saisons, rang).
-4. Clique sur **Analyser le profil** pour voir le verdict et les explications.
+Site web pour estimer si un profil Rainbow Six Siege est **suspect (triche)** ou **type smurf**, à partir des stats qu’on peut voir sur [R6 Tracker](https://r6.tracker.network/r6siege/profile/ubi/).
 
 ## Critères utilisés
 

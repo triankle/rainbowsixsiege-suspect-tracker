@@ -5,10 +5,12 @@
 const CURRENT_SEASON_NUM = 18;
 
 const MIN_LEVEL_FOR_RANKED = 50;
-/** Below this many ranked games, we barely trust K/D (sample too small). */
-const RANKED_LOW_SAMPLE = 15;
-/** From here upward, high K/D starts to count in full. */
-const RANKED_SOLID_SAMPLE = 55;
+/** Below this, K/D is not used for strong cheat signals (sample too small). */
+const RANKED_KD_UNCERTAIN_BELOW = 30;
+/** From here upward, high K/D counts in full. */
+const RANKED_KD_FULL_TRUST = 50;
+/** Few seasons + high rank: need at least this many ranked games to call it smurf-like. */
+const RANKED_MIN_FOR_SEASON_RANK_SMURF = 30;
 /** Gap between two played season numbers → “skipped” seasons; >= this suggests smurf breaks. */
 const SMURF_GAP_SEASONS = 4;
 
@@ -58,12 +60,15 @@ function getPlayedSeasons() {
 }
 
 /**
- * How much we trust K/D vs ranked games: 0 = ignore, 1 = full weight.
+ * How much we trust K/D for cheat-style scoring: 0 below sample floor, then ramp to 1.
  */
-function rankedTrust(rankedGames) {
-  if (rankedGames < RANKED_LOW_SAMPLE) return 0;
-  if (rankedGames >= RANKED_SOLID_SAMPLE) return 1;
-  return (rankedGames - RANKED_LOW_SAMPLE) / (RANKED_SOLID_SAMPLE - RANKED_LOW_SAMPLE);
+function rankedKdTrust(rankedGames) {
+  if (rankedGames < RANKED_KD_UNCERTAIN_BELOW) return 0;
+  if (rankedGames >= RANKED_KD_FULL_TRUST) return 1;
+  const ramp =
+    (rankedGames - RANKED_KD_UNCERTAIN_BELOW) /
+    (RANKED_KD_FULL_TRUST - RANKED_KD_UNCERTAIN_BELOW);
+  return 0.25 + 0.75 * ramp;
 }
 
 function largestSeasonGap(sortedSeasons) {
@@ -107,7 +112,7 @@ function analyzeProfile(input) {
     playedSeasons,
   } = input;
 
-  const trust = rankedTrust(ranked);
+  const kdTrust = rankedKdTrust(ranked);
   const hasWinrate = winrate !== undefined && !Number.isNaN(winrate);
 
   // --- Season pattern (smurf vs one-season blow-up) ---
@@ -138,33 +143,46 @@ function analyzeProfile(input) {
     });
   }
 
-  // --- K/D: only bites after enough ranked games ---
-  if (trust > 0) {
+  // --- K/D: stricter tiers (1.40+ suspicious, 1.50+ very); needs enough games ---
+  if (ranked > 0 && ranked < RANKED_KD_UNCERTAIN_BELOW && kd >= 1.4) {
+    reasons.push({
+      text: `Few ranked games (${ranked}) — K/D (${kd}) is not reliable yet; wait for ~${RANKED_KD_UNCERTAIN_BELOW}+ games.`,
+      type: 'positive',
+    });
+  }
+
+  if (kdTrust > 0) {
     if (kd >= 2.0) {
-      const add = 42 * trust;
-      cheatScore += add;
+      cheatScore += 48 * kdTrust;
       reasons.push({
-        text: `High K/D (${kd}) with ${ranked}+ ranked games — unusual at scale.`,
+        text: `Very high K/D (${kd}) with ${ranked}+ ranked games — strongly unusual at scale.`,
         type: 'negative',
       });
     } else if (kd >= 1.75) {
-      cheatScore += 28 * trust;
+      cheatScore += 38 * kdTrust;
       reasons.push({
-        text: `Strong K/D (${kd}) with a solid ranked sample (${ranked} games).`,
+        text: `Extreme K/D (${kd}) for this sample — cheat-style red flag.`,
         type: 'negative',
       });
-    } else if (kd >= 1.55) {
-      cheatScore += 14 * trust;
+    } else if (kd >= 1.6) {
+      cheatScore += 30 * kdTrust;
       reasons.push({
-        text: `Above-average K/D (${kd}) with enough games to mean something.`,
+        text: `K/D (${kd}) is very high — rarely sustained legitimately over many ranked games.`,
+        type: 'negative',
+      });
+    } else if (kd >= 1.5) {
+      cheatScore += 22 * kdTrust;
+      reasons.push({
+        text: `K/D (${kd}) is very suspicious from ~1.50 upward with enough ranked games.`,
+        type: 'negative',
+      });
+    } else if (kd >= 1.4) {
+      cheatScore += 14 * kdTrust;
+      reasons.push({
+        text: `K/D (${kd}) from ~1.40 is already odd in ranked; worth scrutiny with ${ranked} games.`,
         type: 'negative',
       });
     }
-  } else if (kd >= 1.75 && ranked > 0) {
-    reasons.push({
-      text: `Not many ranked games yet (${ranked}) — K/D alone is weak evidence.`,
-      type: 'positive',
-    });
   }
 
   // --- Win rate ---
@@ -202,9 +220,9 @@ function analyzeProfile(input) {
       });
     }
     if (levelLooksCheapForRank(level, rankStep)) {
-      smurfScore += 25;
+      smurfScore += 34;
       reasons.push({
-        text: `High rank for account level ${level} — often a smurf or alt.`,
+        text: `Rank vs account level ${level} is smurf-leaning (e.g. Emerald+ around ~100–120 is suspect).`,
         type: 'negative',
       });
     }
@@ -219,6 +237,24 @@ function analyzeProfile(input) {
         type: 'negative',
       });
     }
+
+    // Few seasons (2–3) + Diamond+ ≈ smurf if sample is not tiny
+    const fewSeasons =
+      playedSeasons.length >= 2 && playedSeasons.length <= 3;
+    if (fewSeasons && rankStep >= RANK_ORDER.diamond) {
+      if (ranked >= RANKED_MIN_FOR_SEASON_RANK_SMURF) {
+        smurfScore += 38;
+        reasons.push({
+          text: `Only ${playedSeasons.length} ranked season(s) played but ${rankKey} — very smurf-like with ${ranked} games.`,
+          type: 'negative',
+        });
+      } else {
+        reasons.push({
+          text: `Diamond+ with only ${playedSeasons.length} season(s), but under ${RANKED_MIN_FOR_SEASON_RANK_SMURF} ranked games — inconclusive.`,
+          type: 'positive',
+        });
+      }
+    }
   }
 
   if (level >= 120 && ranked >= 200) {
@@ -229,11 +265,11 @@ function analyzeProfile(input) {
     });
   }
 
-  // --- Calm K/D bucket (clean anchor) ---
-  if (kd >= 1.15 && kd <= 1.45 && ranked >= 200) {
+  // --- Calm K/D bucket (clean anchor): cap below “bizarre” 1.40 line ---
+  if (kd >= 1.05 && kd <= 1.35 && ranked >= 200) {
     cheatScore -= 22;
     reasons.push({
-      text: `K/D (${kd}) is ordinary with hundreds of ranked games.`,
+      text: `K/D (${kd}) looks ordinary with hundreds of ranked games.`,
       type: 'positive',
     });
   }
@@ -245,19 +281,19 @@ function analyzeProfile(input) {
   let verdictLabel = 'Inconclusive';
   let verdictClass = 'uncertain';
 
-  if (cheatScore >= 58 && cheatScore >= smurfScore + 8) {
+  if (cheatScore >= 52 && cheatScore >= smurfScore + 6) {
     verdict = 'suspect';
     verdictLabel = 'Strong cheat-style signal (stats + context)';
     verdictClass = 'suspect';
-  } else if (cheatScore >= 45) {
+  } else if (cheatScore >= 38) {
     verdict = 'suspect';
     verdictLabel = 'Suspicious stats — worth a closer look';
     verdictClass = 'suspect';
-  } else if (smurfScore >= 52 && smurfScore >= cheatScore - 5) {
+  } else if (smurfScore >= 44 && smurfScore >= cheatScore - 5) {
     verdict = 'smurf';
     verdictLabel = 'Likely smurf / alt pattern';
     verdictClass = 'smurf';
-  } else if (cheatScore < 30 && smurfScore < 35) {
+  } else if (cheatScore < 26 && smurfScore < 32) {
     verdict = 'clean';
     verdictLabel = 'Looks like a normal long-term profile';
     verdictClass = 'clean';
