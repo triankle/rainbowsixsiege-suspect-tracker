@@ -1,0 +1,34 @@
+{
+  "name": "r6-suspect-tracker",
+  "private": true,
+  "description": "Static UI + Vercel serverless API for optional PostgreSQL saves",
+  "scripts": {
+    "dev": "node scripts/local-dev.cjs",
+    "next:dev": "next dev -p 3001",
+    "next:build": "prisma generate && next build",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:validate": "dotenv -e .env.example -- prisma validate",
+    "db:push": "dotenv -e .env.local -- prisma db push",
+    "db:pull": "dotenv -e .env.local -- prisma db pull",
+    "vercel-build": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "dotenv": "^16.4.7",
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.19.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

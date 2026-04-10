@@ -350,6 +350,83 @@ button[type="submit"]:hover {
   display: none;
 }
 
+.save-db-block {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.save-db-hint {
+  margin: 0 0 0.85rem;
+}
+
+.save-db-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.save-key-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.save-key-input:focus {
+  outline: none;
+  border-color: var(--accent-muted);
+}
+
+.btn-save-db {
+  flex: 0 0 auto;
+  padding: 0.6rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--accent-muted);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.btn-save-db:hover:not(:disabled) {
+  background: rgba(226, 44, 44, 0.12);
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+
+.btn-save-db:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.save-db-feedback {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+}
+
+.save-db-feedback.hidden {
+  display: none;
+}
+
+.save-db-feedback--ok {
+  color: var(--success);
+}
+
+.save-db-feedback--err {
+  color: var(--danger);
+}
+
 .result-section h2 {
   margin-top: 0;
 }

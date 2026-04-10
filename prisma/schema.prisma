@@ -1,0 +1,31 @@
+// Source de structure pour la table suspect_submissions (PostgreSQL / Neon).
+// Sync : npx prisma db pull   (depuis une base existante)
+//        npx prisma db push   (applique le schéma vers une base vide / dev)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SuspectSubmission {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  pseudo         String?
+  kd             Decimal  @db.Decimal(8, 3)
+  winrate        Decimal? @db.Decimal(6, 2)
+  rankedMatches  Int      @map("ranked_matches")
+  accountLevel   Int      @map("account_level")
+  rankKey        String?  @map("rank_key")
+  seasonsPlayed  Int[]    @map("seasons_played")
+  verdict        String
+  verdictLabel   String   @map("verdict_label")
+  cheatScore     Decimal  @map("cheat_score") @db.Decimal(6, 2)
+  smurfScore     Decimal  @map("smurf_score") @db.Decimal(6, 2)
+  reasonsJson    Json     @default("[]") @map("reasons_json")
+
+  @@map("suspect_submissions")
+}

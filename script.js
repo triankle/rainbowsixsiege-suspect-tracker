@@ -30,6 +30,9 @@ const resultSection = document.getElementById('result-section');
 const resultContent = document.getElementById('result-content');
 const formError = document.getElementById('form-error');
 
+/** Snapshot for optional POST /api/submissions after analysis */
+let pendingSavePayload = null;
+
 function buildSeasonCheckboxes() {
   const grid = document.getElementById('season-grid');
   if (!grid) return;
@@ -321,23 +324,85 @@ function hideFormError() {
   formError.classList.add('hidden');
 }
 
+function escapeHtml(text) {
+  const s = String(text);
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function displayResult(analysis) {
   const { verdictLabel, verdictClass, cheatScore, smurfScore, reasons } =
     analysis;
 
   resultContent.innerHTML = `
-    <div class="verdict ${verdictClass}">${verdictLabel}</div>
+    <div class="verdict ${verdictClass}">${escapeHtml(verdictLabel)}</div>
     <p><strong>Cheat-style score:</strong> ${Math.round(cheatScore)}%</p>
     <div class="score-bar"><div class="score-fill suspect" style="width: ${Math.round(cheatScore)}%"></div></div>
     <p><strong>Smurf-style score:</strong> ${Math.round(smurfScore)}%</p>
     <div class="score-bar"><div class="score-fill smurf" style="width: ${Math.round(smurfScore)}%"></div></div>
     ${
       reasons.length
-        ? `<ul class="reasons">${reasons.map((r) => `<li class="${r.type || ''}">${r.text}</li>`).join('')}</ul>`
+        ? `<ul class="reasons">${reasons.map((r) => `<li class="${escapeHtml(r.type || '')}">${escapeHtml(r.text)}</li>`).join('')}</ul>`
         : ''
     }
+    <div class="save-db-block">
+      <p class="hint save-db-hint">Optional: save this check to PostgreSQL (works when the site is deployed with <code>DATABASE_URL</code>, e.g. on Vercel).</p>
+      <div class="save-db-row">
+        <input type="password" id="save-key-input" class="save-key-input" placeholder="Save key (only if server uses SAVE_API_KEY)" autocomplete="off" />
+        <button type="button" class="btn-save-db js-save-submission">Save to database</button>
+      </div>
+      <p id="save-db-feedback" class="save-db-feedback hidden" role="status"></p>
+    </div>
   `;
 }
+
+async function submitSaveToDb() {
+  const feedback = document.getElementById('save-db-feedback');
+  const btn = resultContent.querySelector('.js-save-submission');
+  const keyInput = document.getElementById('save-key-input');
+  if (!pendingSavePayload || !btn) return;
+
+  feedback.classList.add('hidden');
+  feedback.classList.remove('save-db-feedback--ok', 'save-db-feedback--err');
+  btn.disabled = true;
+
+  const headers = { 'Content-Type': 'application/json' };
+  const key = keyInput && keyInput.value ? keyInput.value.trim() : '';
+  if (key) headers['x-save-key'] = key;
+
+  try {
+    const res = await fetch('/api/submissions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(pendingSavePayload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Save failed (${res.status})`);
+    }
+    feedback.textContent = 'Saved to database.';
+    feedback.classList.remove('hidden');
+    feedback.classList.add('save-db-feedback--ok');
+    btn.textContent = 'Saved';
+    btn.disabled = true;
+  } catch (err) {
+    feedback.textContent =
+      err.message ||
+      'Could not reach the API. Use a local server with Vercel (`vercel dev`) or deploy to Vercel with DATABASE_URL.';
+    feedback.classList.remove('hidden');
+    feedback.classList.add('save-db-feedback--err');
+    btn.disabled = false;
+  }
+}
+
+resultSection.addEventListener('click', (e) => {
+  if (e.target.closest('.js-save-submission')) {
+    void submitSaveToDb();
+  }
+});
 
 form.addEventListener('submit', function (e) {
   e.preventDefault();
@@ -376,6 +441,21 @@ form.addEventListener('submit', function (e) {
     rankKey,
     playedSeasons,
   });
+
+  pendingSavePayload = {
+    pseudo: document.getElementById('pseudo').value.trim() || null,
+    kd,
+    winrate: Number.isNaN(winrate) ? null : winrate,
+    ranked,
+    level,
+    rankKey: rankKey || null,
+    playedSeasons,
+    verdict: analysis.verdict,
+    verdictLabel: analysis.verdictLabel,
+    cheatScore: analysis.cheatScore,
+    smurfScore: analysis.smurfScore,
+    reasons: analysis.reasons,
+  };
 
   displayResult(analysis);
   resultSection.classList.remove('hidden');
