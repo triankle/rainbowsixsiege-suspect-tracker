@@ -41,7 +41,7 @@ Tu n’as **rien à refaire** si la table existe déjà : l’insertion **Save t
 
 L’architecture actuelle est **compatible Vercel** :
 
-- Les fichiers statiques à la racine (`index.html`, `styles.css`, `script.js`, `Tokyo Reggie.mp3`, etc.) sont servis tels quels.
+- Les fichiers statiques à la racine (`index.html`, `styles.css`, `script.js`, `music_bg.mp3`, etc.) sont servis tels quels.
 - Le dossier `api/` devient des **Serverless Functions** (`/api/submissions`).
 
 Étapes typiques :
