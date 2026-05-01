@@ -92,6 +92,18 @@
       <h2>Result</h2>
       <div id="result-content"></div>
     </section>
+
+    <section id="db-section" class="db-section">
+      <h2>Stored in database</h2>
+      <p class="hint">Affiche les analyses sauvegardées en PostgreSQL (table <code>suspect_submissions</code>). Disponible localement via <code>npm run dev</code> ou en prod sur Vercel avec <code>DATABASE_URL</code>.</p>
+      <div class="db-controls">
+        <button type="button" id="db-load-btn" class="btn-db-load">Show stored entries</button>
+        <button type="button" id="db-refresh-btn" class="btn-db-refresh hidden">Refresh</button>
+        <button type="button" id="db-hide-btn" class="btn-db-hide hidden">Hide</button>
+      </div>
+      <p id="db-feedback" class="db-feedback hidden" role="status"></p>
+      <div id="db-content" class="db-content hidden"></div>
+    </section>
   </main>
 
   <footer class="site-footer">

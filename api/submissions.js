@@ -34,7 +34,7 @@ function sendEmpty(res, statusCode) {
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
       'Content-Type, x-save-key'
@@ -42,12 +42,12 @@ module.exports = async function handler(req, res) {
     return sendEmpty(res, 204);
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
   const saveSecret = process.env.SAVE_API_KEY;
-  if (saveSecret && String(saveSecret).length > 0) {
+  if (req.method === 'POST' && saveSecret && String(saveSecret).length > 0) {
     const sent = req.headers['x-save-key'];
     if (sent !== saveSecret) {
       return sendJson(res, 401, { error: 'Invalid or missing save key' });
@@ -66,6 +66,36 @@ module.exports = async function handler(req, res) {
       error:
         'DATABASE_URL is still the example value. Replace it with the real URI from Neon / Supabase / etc.',
     });
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const prisma = getPrisma();
+      const rows = await prisma.suspectSubmission.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+      const safe = rows.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        pseudo: r.pseudo,
+        kd: r.kd != null ? Number(r.kd) : null,
+        winrate: r.winrate != null ? Number(r.winrate) : null,
+        rankedMatches: r.rankedMatches,
+        accountLevel: r.accountLevel,
+        rankKey: r.rankKey,
+        seasonsPlayed: r.seasonsPlayed,
+        verdict: r.verdict,
+        verdictLabel: r.verdictLabel,
+        cheatScore: r.cheatScore != null ? Number(r.cheatScore) : null,
+        smurfScore: r.smurfScore != null ? Number(r.smurfScore) : null,
+        reasonsJson: r.reasonsJson,
+      }));
+      return sendJson(res, 200, { ok: true, rows: safe });
+    } catch (err) {
+      console.error('submissions list error', err.message);
+      return sendJson(res, 500, { error: 'Database error' });
+    }
   }
 
   const raw =
