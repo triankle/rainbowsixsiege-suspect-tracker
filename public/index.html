@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R6 Suspect Check — Ranked profile helper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true">
+    <div class="atmosphere__grain"></div>
+    <div class="atmosphere__scanlines"></div>
+    <div class="atmosphere__vignette"></div>
+  </div>
+
+  <header class="masthead">
+    <p class="masthead__kicker">Ranked vetting · not evidence</p>
+    <h1 class="masthead__title">R6 Suspect Check</h1>
+    <p class="tagline">Ranked-only stats from R6 Tracker — for discussion / vetting, not proof</p>
+    <nav class="masthead__nav">
+      <a href="https://r6.tracker.network/r6siege/profile/ubi/" target="_blank" rel="noopener">Open R6 Tracker</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h2>How it works</h2>
+      <p>Copy <strong>ranked</strong> numbers from R6 Tracker. Ranked unlocks at <strong>account level 50</strong> in-game; if the level is below that, the ranked stats are not valid for this tool.</p>
+      <p>Tick <strong>every ranked season</strong> this account has played. The tool looks at K/D and win rate <em>only after enough ranked games</em>, checks season pattern (only current season vs. long breaks), and separates <strong>cheat-like</strong> stats from <strong>smurf-like</strong> history.</p>
+    </section>
+
+    <section class="form-section">
+      <h2>Player stats</h2>
+      <p id="form-error" class="form-error hidden" role="alert"></p>
+      <form id="stats-form">
+        <div class="field">
+          <label for="pseudo">Username (optional)</label>
+          <input type="text" id="pseudo" name="pseudo" placeholder="e.g. Player.One">
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="kd">K/D (ranked)</label>
+            <input type="number" id="kd" name="kd" step="0.01" min="0" placeholder="e.g. 1.45" required>
+          </div>
+          <div class="field">
+            <label for="winrate">Win rate % (ranked)</label>
+            <input type="number" id="winrate" name="winrate" min="0" max="100" step="0.1" placeholder="e.g. 52">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ranked">Ranked matches played</label>
+          <input type="number" id="ranked" name="ranked" min="0" placeholder="e.g. 310" required>
+        </div>
+
+        <div class="field">
+          <label for="level">Account level</label>
+          <input type="number" id="level" name="level" min="50" required placeholder="e.g. 180 (min. 50 for ranked)">
+          <span class="hint">Must be at least 50 for ranked — the form blocks analysis if lower.</span>
+        </div>
+
+        <fieldset class="seasons-fieldset">
+          <legend>Ranked seasons played</legend>
+          <p class="hint">Check each season this account has played ranked. The last one is treated as the <strong>current</strong> season (change the constant in <code>script.js</code> when Ubisoft releases a new season).</p>
+          <div class="season-grid" id="season-grid" aria-label="Season checkboxes"></div>
+        </fieldset>
+
+        <div class="field">
+          <label for="rank">Current rank (optional)</label>
+          <select id="rank" name="rank">
+            <option value="">— Not set —</option>
+            <option value="copper">Copper</option>
+            <option value="bronze">Bronze</option>
+            <option value="silver">Silver</option>
+            <option value="gold">Gold</option>
+            <option value="platinum">Platinum</option>
+            <option value="emerald">Emerald</option>
+            <option value="diamond">Diamond</option>
+            <option value="champion">Champion</option>
+          </select>
+        </div>
+
+        <button type="submit">Analyze profile</button>
+      </form>
+    </section>
+
+    <section id="result-section" class="result-section hidden">
+      <h2>Result</h2>
+      <div id="result-content"></div>
+    </section>
+
+    <section id="db-section" class="db-section">
+      <h2>Stored in database</h2>
+      <p class="hint">Affiche les analyses sauvegardées en PostgreSQL (table <code>suspect_submissions</code>). Disponible localement via <code>npm run dev</code> ou en prod sur Vercel avec <code>DATABASE_URL</code>.</p>
+      <div class="db-controls">
+        <button type="button" id="db-load-btn" class="btn-db-load">Show stored entries</button>
+        <button type="button" id="db-refresh-btn" class="btn-db-refresh hidden">Refresh</button>
+        <button type="button" id="db-hide-btn" class="btn-db-hide hidden">Hide</button>
+      </div>
+      <p id="db-feedback" class="db-feedback hidden" role="status"></p>
+      <div id="db-content" class="db-content hidden"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Template Datas from <a href="https://r6.tracker.network/r6siege/profile/ubi/" target="_blank" rel="noopener">r6.tracker.network</a>. Indicative only — not evidence of cheating.</p>
+  </footer>
+
+  <audio id="bg-audio" loop preload="auto" playsinline>
+    <source src="./music_bg.mp3" type="audio/mpeg">
+  </audio>
+  <button type="button" id="audio-toggle" class="audio-toggle" aria-pressed="false" title="Musique d’ambiance (faible volume) — clic pour lancer">
+    ♪ Ambience
+  </button>
+
+  <script src="script.js"></script>
+</body>
+</html>

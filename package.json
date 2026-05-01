@@ -1,9 +1,10 @@
 {
   "name": "r6-suspect-tracker",
   "private": true,
-  "description": "Static UI + Vercel serverless API for optional PostgreSQL saves",
+  "description": "R6 suspect checker: static UI in public/ + Vercel serverless API + optional Next + PostgreSQL",
   "scripts": {
     "dev": "node scripts/local-dev.cjs",
+    "build": "prisma generate && next build",
     "next:dev": "next dev -p 3001",
     "next:build": "prisma generate && next build",
     "postinstall": "prisma generate",

@@ -3,6 +3,8 @@
 > Site web qui aide à juger un profil **Rainbow Six Siege** (joueur potentiellement *cheater* ou *smurf*) à partir de stats ranked saisies à la main depuis [r6.tracker.network](https://r6.tracker.network/r6siege/profile/ubi/).
 > Les analyses peuvent être **sauvegardées en PostgreSQL** via une route serverless, et **relues** depuis la même page d'accueil.
 
+> **Organisation du dépôt** : l’UI statique (HTML, CSS, JS, musique) est dans **`public/`** ; la documentation longue dans **`docs/DOCUMENTATION.md`**. En dev (`npm run dev`) et avec Next/Vercel, ces fichiers sont servis aux URL `/`, `/index.html`, `/styles.css`, etc.
+
 ---
 
 ## 1. Vue d'ensemble
@@ -22,7 +24,7 @@ Outil web léger qui :
 | **Serverless Vercel** pour l'API | Déploiement gratuit, pas de serveur à maintenir, scaling automatique. |
 | **PostgreSQL (Neon)** pour la base | Postgres managé, free tier, branché en quelques secondes. |
 | **Prisma** comme ORM | Schéma typé, génération automatique du client, requêtes lisibles, multi-runtime (Node + Next.js). |
-| **Next.js (App Router)** en option | Server Component qui lit la table en SSR — alternative à la consultation depuis `index.html`. |
+| **Next.js (App Router)** en option | Server Component qui lit la table en SSR — alternative au viewer intégré dans `public/index.html`. |
 
 ---
 
@@ -34,9 +36,9 @@ Outil web léger qui :
 ┌────────────────────────────────────────────────────────────────────┐
 │                       Navigateur (utilisateur)                      │
 │                                                                    │
-│  index.html  ──►  styles.css                                        │
+│  public/index.html  ──►  public/styles.css                          │
 │       │                                                            │
-│       └──►  script.js                                               │
+│       └──►  public/script.js                                        │
 │              ├── Heuristiques (analyzeProfile)                      │
 │              ├── POST /api/submissions  ──── Save to database       │
 │              └── GET  /api/submissions  ──── Show stored entries    │
@@ -46,7 +48,7 @@ Outil web léger qui :
 ┌────────────────────────────────────────────────────────────────────┐
 │        Vercel  (statique + Serverless Functions)                   │
 │                                                                    │
-│   /                       →  index.html, styles.css, script.js …   │
+│   /  (fichiers issus de public/)  →  index.html, styles.css, …     │
 │   /api/submissions        →  api/submissions.js  (Node serverless) │
 │                                  │                                 │
 │                                  ▼                                 │
@@ -67,7 +69,7 @@ Outil web léger qui :
 [1] L'utilisateur remplit le formulaire (KD, WR, ranked, niveau, saisons, rang)
         │
         ▼
-[2] script.js → analyzeProfile(input)
+[2] public/script.js → analyzeProfile(input)
     ├─ matchConfidence(ranked)               (low / medium / high)
     ├─ kdBaseCheat(kd) × rankKdCheatMultiplier(rankStep)
     ├─ rankKdSmurfBoost(kd, rankStep)
@@ -101,45 +103,49 @@ Outil web léger qui :
 ```
 rainbowsixsiege-suspect-tracker/
 │
-├── index.html              ← Page d'accueil (formulaire + résultat + viewer BDD)
-├── styles.css              ← Thème editorial-noir (Paradise Hotel like)
-├── script.js               ← Heuristiques + DOM + appels API (POST/GET)
-├── music_bg.mp3            ← Ambiance sonore (toggle UI)
+├── public/                  ← Outil principal (servi à / par Next et par local-dev)
+│   ├── index.html           ← Page d'accueil (formulaire + résultat + viewer BDD)
+│   ├── styles.css           ← Thème editorial-noir
+│   ├── script.js            ← Heuristiques + DOM + appels API (POST/GET)
+│   └── music_bg.mp3         ← Ambiance sonore (toggle UI)
+│
+├── docs/
+│   └── DOCUMENTATION.md     ← Ce document (soutenance / onboarding)
 │
 ├── api/
-│   └── submissions.js      ← Serverless Function : POST (insert) + GET (list)
+│   └── submissions.js       ← Serverless Function : POST (insert) + GET (list)
 │
 ├── lib/
-│   ├── prisma.ts           ← Client Prisma pour Next.js (lib/prisma)
-│   └── node-prisma.js      ← Client Prisma pour les fonctions Node (api/*.js)
+│   ├── prisma.ts            ← Client Prisma pour Next.js (lib/prisma)
+│   └── node-prisma.js       ← Client Prisma pour les fonctions Node (api/*.js)
 │
 ├── prisma/
-│   ├── schema.prisma       ← Source du schéma : modèle SuspectSubmission
-│   └── db.ts               ← Réexport pour code TS
+│   ├── schema.prisma        ← Source du schéma : modèle SuspectSubmission
+│   └── db.ts                ← Réexport pour code TS
 │
 ├── db/
-│   └── schema.sql          ← Équivalent SQL pur (alternative à `prisma db push`)
+│   └── schema.sql           ← Équivalent SQL pur (alternative à `prisma db push`)
 │
-├── app/                    ← App Next.js (alternative au viewer in-page)
+├── app/                     ← App Next.js (historique SSR optionnel)
 │   ├── layout.tsx
-│   ├── page.tsx            ← Server Component : lecture de la table
+│   ├── page.tsx             ← Server Component : lecture de la table
 │   └── globals.css
 │
 ├── scripts/
-│   └── local-dev.cjs       ← Mini-serveur Node : sert le statique + /api/*
+│   └── local-dev.cjs        ← Mini-serveur Node : sert public/ + /api/*
 │
-├── .env.example            ← Modèle de variables d'environnement
-├── .env.local              ← (non versionné) DATABASE_URL réelle
-├── package.json            ← Scripts npm (dev, db:*, next:*)
-├── prisma → .next → .vercel  (dossiers générés)
-└── README.md / DOCUMENTATION.md
+├── .env.example             ← Modèle de variables d'environnement
+├── .env.local               ← (non versionné) DATABASE_URL réelle
+├── package.json             ← Scripts npm (dev, db:*, next:*)
+├── node_modules → .next → .vercel  (dossiers générés ou ignorés)
+└── README.md
 ```
 
 ---
 
-## 4. Front-end (page statique)
+## 4. Front-end (fichiers dans `public/`)
 
-### 4.1 `index.html`
+### 4.1 `public/index.html`
 Trois sections principales dans `<main>` :
 
 1. **`.intro`** — explication du fonctionnement (rappels Ubisoft : ranked à partir du niveau 50).
@@ -149,13 +155,13 @@ Trois sections principales dans `<main>` :
 3. **`#result-section`** — verdict + scores + raisons + bloc « Save to database ».
 4. **`#db-section`** — viewer BDD avec les boutons **Show stored entries / Refresh / Hide** et la table des sauvegardes.
 
-### 4.2 `styles.css`
+### 4.2 `public/styles.css`
 Thème **editorial-noir** :
 - Palette : `--ink` `#070708`, `--accent` `#e22c2c` (rouge), monospace `IBM Plex Mono`, display `Syne`.
 - Atmosphère : grain SVG animé, scanlines, vignette radiale (effet ciné).
 - Composants : verdicts colorés (`suspect`, `smurf`, `clean`, `uncertain`), barres de score, tables responsive.
 
-### 4.3 `script.js` — l'algorithme
+### 4.3 `public/script.js` — l'algorithme
 
 **Constantes pivots :**
 ```js
@@ -330,7 +336,7 @@ DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 
 ### 8.2 Structure compatible
 ```
-/                       → fichiers statiques (index.html, styles.css, script.js, …)
+/                       → fichiers dans public/ (mêmes URL : /index.html, /styles.css, …)
 /api/submissions        → api/submissions.js (Node serverless, runtime auto)
 /_next                  → (uniquement si on déploie Next.js en parallèle)
 ```
@@ -388,7 +394,7 @@ npm run db:push                   # via Prisma
 ```bash
 npm run dev
 # ► Mini serveur Node :
-#   - sert index.html, styles.css, script.js, music_bg.mp3
+#   - sert public/ à la racine des URL (/, index.html, styles.css, script.js, music_bg.mp3)
 #   - route /api/submissions vers api/submissions.js
 # ► http://localhost:3000
 ```
@@ -400,6 +406,7 @@ npx vercel dev                    # même routing qu'en prod
 
 Variante sans BDD (juste pour montrer l'analyse côté client) :
 ```bash
+cd public
 python -m http.server 8000
 # ► http://localhost:8000  (les boutons Save/Show afficheront une erreur réseau)
 ```
@@ -407,7 +414,7 @@ python -m http.server 8000
 ### 9.5 Page Next.js (alternative à la consultation in-page)
 ```bash
 npm run next:dev                  # ► http://localhost:3001
-# affiche app/page.tsx : tableau SSR depuis Prisma
+# affiche app/page.tsx sur / ; l’outil statique est aussi sur http://localhost:3001/index.html (dossier public/)
 ```
 
 ### 9.6 Scripts npm récap
@@ -428,7 +435,7 @@ npm run next:dev                  # ► http://localhost:3001
 | Risque | Mesure |
 |--------|--------|
 | Injection SQL | Prisma paramètre toutes les requêtes → impossible. |
-| XSS dans les raisons / pseudo | `escapeHtml()` côté `script.js` avant injection DOM. |
+| XSS dans les raisons / pseudo | `escapeHtml()` dans `public/script.js` avant injection DOM. |
 | Spam de l'endpoint POST | Variable `SAVE_API_KEY` + en-tête `x-save-key`. |
 | Lecture sensible | GET ne retourne pas de données privées (pas de tokens, pas d'IP, pas de mot de passe stocké). |
 | Secrets versionnés | `.env.local` est dans `.gitignore`. |
@@ -450,7 +457,7 @@ npm run next:dev                  # ► http://localhost:3001
 - `CURRENT_SEASON_NUM` doit être **incrémenté manuellement** à chaque nouvelle saison ranked.
 - Le viewer BDD est **non paginé** (200 lignes max) — suffisant pour la démo, à paginer en prod.
 - Pas de filtres / tri dans le tableau (axe d'amélioration : sort côté client, recherche par pseudo).
-- Pas de tests automatisés — on pourrait ajouter Vitest/Jest sur les fonctions pures de `script.js`.
+- Pas de tests automatisés — on pourrait ajouter Vitest/Jest sur les fonctions pures de `public/script.js`.
 
 ---
 
@@ -458,7 +465,7 @@ npm run next:dev                  # ► http://localhost:3001
 
 1. **Intro (1 min)** — montrer la page, expliquer le contexte (R6 ranked, problème de cheat/smurf).
 2. **Démo formulaire (2 min)** — saisir un profil clean, puis un profil suspect, montrer les deux verdicts.
-3. **Sous le capot du JS (1 min)** — ouvrir `script.js`, montrer `analyzeProfile()` et la composition des scores.
+3. **Sous le capot du JS (1 min)** — ouvrir `public/script.js`, montrer `analyzeProfile()` et la composition des scores.
 4. **Sauvegarde BDD (2 min)** — cliquer « Save to database », ouvrir la console Neon pour voir la ligne, puis revenir sur la page et cliquer « Show stored entries ».
 5. **Architecture (2 min)** — schéma de l'archi (Vercel statique + serverless + Postgres + Prisma).
 6. **Prisma + Vercel (1 min)** — montrer `schema.prisma`, expliquer pourquoi deux clients (`lib/prisma.ts` + `lib/node-prisma.js`).
@@ -488,3 +495,85 @@ npm run next:dev                  # ► http://localhost:3001
 
 > *« Quel est le coût de l'app ? »*
 > Free tier Vercel + Free tier Neon → 0 € jusqu'à un trafic non-trivial. À l'échelle, la facturation est proportionnelle aux invocations serverless et au stockage Postgres.
+
+---
+
+## 14. Inventaire des dossiers et fichiers (rôle de chacun)
+
+À la racine du dépôt, hors dépendances générées.
+
+### Racine
+
+| Fichier / dossier | Rôle |
+|-------------------|------|
+| **`public/`** | Dossier **Next.js « public »** : assets servis à la racine des URL (`/`, `/index.html`, `/styles.css`, …). Contient l’outil principal (voir tableau ci‑dessous). |
+| **`docs/`** | Documentation longue : **`DOCUMENTATION.md`** (ce fichier) pour soutenance / onboarding détaillé. |
+| **`package.json`** | Scripts npm (`dev`, `next:dev`, `db:*`, `vercel-build`, `postinstall`) et liste des paquets (Next, React, Prisma…). |
+| **`package-lock.json`** | Verrouillage exact des versions installées pour des installs reproductibles. |
+| **`README.md`** | Guide rapide : critères, structure du dépôt, Prisma, Vercel, commandes locales. |
+| **`.env.example`** | Modèle des variables d’environnement (`DATABASE_URL`, `SAVE_API_KEY`) — valeurs factices, sûr à versionner. |
+| **`.env.local`** | *(non versionné)* Secrets réels en local : copie de `.env.example` avec ta vraie `DATABASE_URL`. Lu par `dotenv` dans `local-dev.cjs` et par Next/Prisma selon le contexte. |
+| **`.gitignore`** | Fichiers à ne pas committer (`node_modules`, `.next`, `.env*`, `.vercel`, logs). |
+| **`next.config.ts`** | Configuration Next.js (ici vide = défauts). |
+| **`tsconfig.json`** | Options TypeScript (chemins `@/*`, cibles de compilation pour l’app Next). |
+| **`next-env.d.ts`** | Fichier généré par Next — déclarations de types pour l’environnement (ne pas éditer à la main en général). |
+
+### `public/` (interface navigateur)
+
+| Fichier | Rôle |
+|---------|------|
+| **`index.html`** | Page principale : intro, formulaire de stats, zone résultat, bloc « Save to database », section « Stored in database » (consultation BDD), références aux assets. |
+| **`styles.css`** | Thème visuel (typo, couleurs, ambiance grain/scanlines, formulaire, verdicts, barres de score, viewer BDD, bouton audio). |
+| **`script.js`** | Heuristiques (`analyzeProfile`), saisons, validation, affichage résultat, `POST`/`GET /api/submissions`, audio d’ambiance. |
+| **`music_bg.mp3`** | Piste lue en boucle (faible volume) après action utilisateur sur le toggle audio. |
+
+### `api/`
+
+| Fichier | Rôle |
+|---------|------|
+| **`submissions.js`** | **Vercel Serverless Function** (CommonJS) exposée en **`/api/submissions`** : `POST` insertion d’une analyse via Prisma, `GET` liste des 200 dernières lignes, `OPTIONS` CORS, validation `DATABASE_URL`, option `SAVE_API_KEY` pour le POST. |
+
+### `app/` (Next.js — App Router)
+
+| Fichier | Rôle |
+|---------|------|
+| **`layout.tsx`** | Layout racine : import de `globals.css`, métadonnées, wrapper `<html>` / `<body>`. |
+| **`page.tsx`** | Page **`/`** en Next (port 3001 en `next:dev`) : **Server Component** qui lit `suspect_submissions` avec Prisma et affiche un tableau d’historique — alternative au viewer dans `public/index.html`. |
+| **`globals.css`** | Styles spécifiques à la page Next (tableau historique, bannières d’erreur). |
+
+### `db/`
+
+| Fichier | Rôle |
+|---------|------|
+| **`schema.sql`** | Script SQL **à exécuter une fois** sur PostgreSQL si tu préfères créer la table sans `prisma db push` — définit `suspect_submissions` + index sur `created_at`. |
+
+### `lib/`
+
+| Fichier | Rôle |
+|---------|------|
+| **`prisma.ts`** | **Client Prisma singleton** pour **Next.js** (TypeScript, alias `@/lib/prisma`). |
+| **`node-prisma.js`** | **Même id** pour les fonctions Node en CommonJS (`api/submissions.js`). Nommé ainsi pour **éviter** qu’un fichier `prisma.js` ne soit résolu à la place du `.ts` dans Next. |
+
+### `prisma/`
+
+| Fichier | Rôle |
+|---------|------|
+| **`schema.prisma`** | **Source de vérité** du modèle de données : datasource PostgreSQL, modèle `SuspectSubmission` ↔ table `suspect_submissions`, génération du client `@prisma/client`. |
+| **`db.ts`** | Petit réexport de `../lib/prisma` pour les scripts ou imports qui pointent vers le dossier `prisma/`. |
+
+### `scripts/`
+
+| Fichier | Rôle |
+|---------|------|
+| **`local-dev.cjs`** | Serveur HTTP local pour **`npm run dev`** : sert le dossier **`public/`** aux URL racine (`/`, fichiers CSS/JS/MP3) et délègue **`/api/submissions`** au même handler que Vercel, avec lecture du corps JSON et chargement de `.env.local`. |
+
+### Dossiers générés / machine locale (souvent absents du dépôt Git)
+
+| Dossier / fichier | Rôle |
+|-------------------|------|
+| **`node_modules/`** | Dépendances installées par `npm install` (Prisma, Next, React, etc.). |
+| **`.next/`** | Build et cache **Next.js** (créé par `next dev` / `next build`). |
+| **`.vercel/`** | Config locale du CLI Vercel après `npx vercel` (projet lié, tokens — ne pas partager). |
+| **`node_modules/.prisma/`** | Client Prisma **généré** par `prisma generate` (`postinstall`). |
+
+> **Résumé** : l’interface utilisateur principale est dans **`public/`** (`index.html`, `styles.css`, `script.js`) ; la **persistance** passe par **`api/submissions.js`** + **Prisma** + **`prisma/schema.prisma`** ; **Next** (`app/`) est une **page d’historique optionnelle** ; **`scripts/local-dev.cjs`** reproduit localement le couple statique + API sans déployer ; la doc longue est dans **`docs/DOCUMENTATION.md`**.

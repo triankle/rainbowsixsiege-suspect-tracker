@@ -36,8 +36,9 @@ export default async function Page() {
       <p className="sub">
         Données lues depuis PostgreSQL via Prisma (table{' '}
         <code>suspect_submissions</code>). Pour analyser un joueur, utilise l’outil
-        statique avec <code>npm run dev</code> (port 3000) puis ouvre{' '}
-        <code>index.html</code> sur ce serveur.
+        statique avec <code>npm run dev</code> (port 3000, racine <code>/</code>) ou{' '}
+        <code>npm run next:dev</code> puis <code>/index.html</code> (port 3001). Fichiers
+        source : <code>public/index.html</code>
       </p>
 
       {error ? (

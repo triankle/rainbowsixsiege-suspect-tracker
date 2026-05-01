@@ -1,5 +1,5 @@
 /**
- * Local dev: serves static files + POST /api/submissions (loads .env.local).
+ * Local dev: serves static files from public/ + /api/submissions (loads .env.local).
  * Usage: npm run dev → http://localhost:3000
  */
 const http = require('http');
@@ -9,7 +9,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const submissionsHandler = require(path.join(__dirname, '..', 'api', 'submissions.js'));
-const root = path.join(__dirname, '..');
+const staticRoot = path.join(__dirname, '..', 'public');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -83,9 +83,14 @@ const server = http.createServer(async (req, res) => {
 
   let rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
   rel = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
-  const filePath = path.join(root, rel);
+  const filePath = path.join(staticRoot, rel);
+  const resolvedFile = path.resolve(filePath);
+  const resolvedStatic = path.resolve(staticRoot);
 
-  if (!filePath.startsWith(root)) {
+  if (
+    resolvedFile !== resolvedStatic &&
+    !resolvedFile.startsWith(resolvedStatic + path.sep)
+  ) {
     res.statusCode = 403;
     return res.end('Forbidden');
   }
@@ -118,7 +123,7 @@ function listenOnPort(port) {
         console.warn(`Port ${PREFERRED} was busy — using ${p} instead.`);
       }
       console.log(`Open http://localhost:${p}`);
-      console.log('Env loaded from .env.local (DATABASE_URL for Save to database).');
+      console.log('Serving static from public/. Env: .env.local (DATABASE_URL for API).');
       return;
     } catch (err) {
       if (err.code !== 'EADDRINUSE') {

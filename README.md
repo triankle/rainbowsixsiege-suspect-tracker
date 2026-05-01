@@ -1,23 +1,39 @@
 # R6 Suspect Check
 Site web pour estimer si un profil Rainbow Six Siege est **suspect (triche)** ou **type smurf**, à partir des stats qu’on peut voir sur [R6 Tracker](https://r6.tracker.network/r6siege/profile/ubi/).
 
+## Structure du dépôt
+
+```
+├── public/              ← Outil principal (HTML, CSS, JS, musique) — servi à / en dev et par Next en prod
+├── api/                 ← Serverless Vercel : /api/submissions
+├── app/                 ← Next.js (App Router) — page / historique optionnelle
+├── lib/                 ← Client Prisma (Next + Node)
+├── prisma/              ← schéma Prisma + réexports
+├── db/                  ← schema.sql PostgreSQL
+├── scripts/             ← local-dev.cjs (npm run dev)
+├── docs/
+│   └── DOCUMENTATION.md ← doc soutenance (architecture, inventaire détaillé)
+├── package.json
+└── README.md
+```
+
 ## Critères utilisés
 
 - **Suspicion triche** : K/D très élevé avec peu de parties, win rate très haut avec peu de jeux.
 - **Smurf** : rang élevé avec niveau compte bas, peu de parties pour le rang, peu de saisons jouées.
 - **Profil propre** : beaucoup de parties, plusieurs saisons, K/D dans la norme.
 
-## Fichiers
+## Fichiers utiles
 
-- `index.html` — structure de la page (formulaire + zone résultat).
-- `styles.css` — mise en forme (thème sombre type R6).
-- `script.js` — calcul des scores et affichage du résultat.
-- `api/submissions.js` — route serverless : enregistrement via **Prisma**.
+- `public/index.html` — structure de la page (formulaire + zone résultat + viewer BDD).
+- `public/styles.css` — mise en forme (thème sombre type R6).
+- `public/script.js` — calcul des scores et affichage du résultat.
+- `api/submissions.js` — route serverless : lecture + enregistrement via **Prisma**.
 - `prisma/schema.prisma` — modèle `SuspectSubmission` ↔ table `suspect_submissions`.
 - `lib/prisma.ts` — client Prisma pour Next.js ; `lib/node-prisma.js` — `getPrisma()` pour `api/submissions.js` (évite le conflit de nom avec `@/lib/prisma`).
 - `db/schema.sql` — équivalent SQL à exécuter une fois sur Neon si tu n’utilises pas `db push`.
 - `package.json` — scripts `db:*` et génération du client au `npm install`.
-- `cours.txt` — ton cours web (HTML, CSS, Git).
+- `docs/DOCUMENTATION.md` — documentation détaillée pour soutenance / onboarding.
 
 ## Sauvegarde PostgreSQL (optionnelle)
 
@@ -41,8 +57,8 @@ Tu n’as **rien à refaire** si la table existe déjà : l’insertion **Save t
 
 L’architecture actuelle est **compatible Vercel** :
 
-- Les fichiers statiques à la racine (`index.html`, `styles.css`, `script.js`, `music_bg.mp3`, etc.) sont servis tels quels.
-- Le dossier `api/` devient des **Serverless Functions** (`/api/submissions`).
+- Les fichiers statiques sont dans **`public/`** : Next.js les expose à la racine des URL (`/index.html`, `/styles.css`, …) ; **`npm run dev`** sert aussi ce dossier à la racine.
+- Le dossier **`api/`** devient des **Serverless Functions** (`/api/submissions`).
 
 Étapes typiques :
 
@@ -53,13 +69,14 @@ L’architecture actuelle est **compatible Vercel** :
 
 En local, **`vercel dev`** démarre le même routage que en prod (statique + `/api/*`) et lit `.env.local` (copie `.env.example` → `.env.local`).
 
-Ouvrir seulement `index.html` en `file://` ne permet pas d’appeler `/api/submissions` ; utilise `vercel dev` ou un déploiement.
+Ouvrir seulement `public/index.html` en `file://` ne permet pas d’appeler `/api/submissions` ; utilise `npm run dev`, `npx vercel dev` ou un déploiement.
 
 ## Lancer en local
 
-**Sans base de données** — page statique seule :
+**Sans base de données** — page statique seule (API indisponible) :
 
 ```bash
+cd public
 python -m http.server 8000
 # Puis http://localhost:8000
 ```
@@ -70,7 +87,7 @@ python -m http.server 8000
 npm install
 # Renseigne DATABASE_URL dans .env.local (voir commentaires dans le fichier)
 npm run dev
-# → http://localhost:3000 (page + /api/submissions sans installer Vercel CLI)
+# → http://localhost:3000 (racine = public/index.html + /api/submissions)
 ```
 
 Alternative : `npx vercel dev` si tu préfères le même runtime que en production.
@@ -78,7 +95,7 @@ Alternative : `npx vercel dev` si tu préfères le même runtime que en producti
 ## Page Next.js (historique en base)
 
 - **`app/page.tsx`** — Server Component : lit **`suspect_submissions`** avec Prisma et affiche un tableau (jusqu’à 200 lignes).
-- **`npm run next:dev`** — lance Next sur **http://localhost:3001** (l’outil formulaire reste sur **`npm run dev`** → port **3000**).
+- **`npm run next:dev`** — lance Next sur **http://localhost:3001** ; l’outil formulaire est aussi disponible en **`http://localhost:3001/index.html`** (fichiers `public/`). Pour API + statique comme en prod Vercel, préfère **`npm run dev`** (port **3000**) ou **`npx vercel dev`**.
 - Next charge automatiquement **`.env.local`** pour **`DATABASE_URL`**.
 
 Build production Next : **`npm run next:build`**.
