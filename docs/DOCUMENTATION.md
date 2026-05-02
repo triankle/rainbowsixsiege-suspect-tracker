@@ -1,6 +1,6 @@
 # R6 Suspect Check — Documentation technique (soutenance)
 
-> Site web qui aide à juger un profil **Rainbow Six Siege** (joueur potentiellement *cheater* ou *smurf*) à partir de stats ranked saisies à la main depuis [r6.tracker.network](https://r6.tracker.network/r6siege/profile/ubi/).
+> Site web qui aide à juger un profil **Rainbow Six Siege** (joueur potentiellement *cheater* ou *smurf*) à partir de stats ranked saisies à la main depuis [r6.tracker.network](https://r6.tracker.network/).
 > Les analyses peuvent être **sauvegardées en PostgreSQL** via une route serverless, et **relues** depuis la même page d'accueil.
 
 > **Organisation du dépôt** : l’UI statique (HTML, CSS, JS, musique) est dans **`public/`** ; la documentation longue dans **`docs/DOCUMENTATION.md`**. En dev (`npm run dev`) et avec Next/Vercel, ces fichiers sont servis aux URL `/`, `/index.html`, `/styles.css`, etc.
