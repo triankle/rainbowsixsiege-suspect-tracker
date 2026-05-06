@@ -603,6 +603,14 @@ button[type="submit"]:hover {
   display: none;
 }
 
+a.btn-db-load,
+a.btn-db-refresh,
+a.btn-db-hide {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+}
+
 .db-feedback {
   margin: 0.5rem 0 0;
   font-size: 0.8rem;

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stored entries — R6 Suspect Check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true">
+    <div class="atmosphere__grain"></div>
+    <div class="atmosphere__scanlines"></div>
+    <div class="atmosphere__vignette"></div>
+  </div>
+
+  <header class="masthead">
+    <p class="masthead__kicker">Ranked vetting · not evidence</p>
+    <h1 class="masthead__title">R6 Suspect Check</h1>
+    <p class="tagline">Stored analyses from PostgreSQL</p>
+    <nav class="masthead__nav">
+      <a href="/">Back to checker</a>
+      <a href="https://r6.tracker.network/" target="_blank" rel="noopener">Open R6 Tracker</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="db-section">
+      <h2>Stored in database</h2>
+      <p class="hint">Analyses saved to PostgreSQL (table <code>suspect_submissions</code>).</p>
+      <div class="db-controls">
+        <input type="password" id="read-key-input" class="save-key-input" placeholder="Read key (only if server uses READ_API_KEY)" autocomplete="off" />
+        <button type="button" id="db-refresh-btn" class="btn-db-refresh">Refresh</button>
+      </div>
+      <p id="db-feedback" class="db-feedback hidden" role="status"></p>
+      <div id="db-content" class="db-content"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Template Datas from <a href="https://r6.tracker.network/" target="_blank" rel="noopener">r6.tracker.network</a>. Indicative only — not evidence of cheating.</p>
+  </footer>
+
+  <script>
+    const dbContent = document.getElementById('db-content');
+    const dbFeedback = document.getElementById('db-feedback');
+    const dbRefreshBtn = document.getElementById('db-refresh-btn');
+    const readKeyInput = document.getElementById('read-key-input');
+
+    function setDbFeedback(message, kind) {
+      if (!dbFeedback) return;
+      if (!message) {
+        dbFeedback.textContent = '';
+        dbFeedback.classList.add('hidden');
+        dbFeedback.classList.remove('db-feedback--ok', 'db-feedback--err');
+        return;
+      }
+      dbFeedback.textContent = message;
+      dbFeedback.classList.remove('hidden', 'db-feedback--ok', 'db-feedback--err');
+      if (kind === 'ok') dbFeedback.classList.add('db-feedback--ok');
+      if (kind === 'err') dbFeedback.classList.add('db-feedback--err');
+    }
+
+    function escapeHtml(text) {
+      const s = String(text);
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatDate(value) {
+      if (!value) return '—';
+      try {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return String(value);
+        return d.toISOString().replace('T', ' ').slice(0, 19);
+      } catch {
+        return String(value);
+      }
+    }
+
+    function formatReasons(reasons) {
+      if (!Array.isArray(reasons) || reasons.length === 0) return '—';
+      const head = reasons.slice(0, 2).map((r) => {
+        if (r && typeof r === 'object' && typeof r.text === 'string') return r.text;
+        return JSON.stringify(r);
+      });
+      const more = reasons.length > 2 ? ` (+${reasons.length - 2})` : '';
+      return head.join(' · ') + more;
+    }
+
+    function renderDbRows(rows) {
+      if (!dbContent) return;
+      if (!rows || rows.length === 0) {
+        dbContent.innerHTML = '<p class="hint">Aucune ligne enregistrée pour l’instant.</p>';
+        dbContent.classList.remove('hidden');
+        return;
+      }
+
+      const head = `
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Pseudo</th>
+            <th>K/D</th>
+            <th>WR%</th>
+            <th>Ranked</th>
+            <th>Niv.</th>
+            <th>Rang</th>
+            <th>Saisons</th>
+            <th>Verdict</th>
+            <th>Cheat%</th>
+            <th>Smurf%</th>
+            <th>Raisons (aperçu)</th>
+          </tr>
+        </thead>`;
+
+      const body = rows
+        .map((row) => {
+          const seasons = Array.isArray(row.seasonsPlayed)
+            ? row.seasonsPlayed.join(', ')
+            : '—';
+          return `<tr>
+            <td class="mono">${escapeHtml(formatDate(row.createdAt))}</td>
+            <td>${escapeHtml(row.pseudo ?? '—')}</td>
+            <td class="mono">${row.kd != null ? Number(row.kd).toFixed(2) : '—'}</td>
+            <td class="mono">${row.winrate != null ? Number(row.winrate).toFixed(1) : '—'}</td>
+            <td class="mono">${row.rankedMatches ?? '—'}</td>
+            <td class="mono">${row.accountLevel ?? '—'}</td>
+            <td>${escapeHtml(row.rankKey ?? '—')}</td>
+            <td class="mono">${escapeHtml(seasons)}</td>
+            <td><strong>${escapeHtml(row.verdict ?? '—')}</strong><br><span class="reasons-preview">${escapeHtml(row.verdictLabel ?? '')}</span></td>
+            <td class="mono">${row.cheatScore != null ? Number(row.cheatScore).toFixed(0) : '—'}</td>
+            <td class="mono">${row.smurfScore != null ? Number(row.smurfScore).toFixed(0) : '—'}</td>
+            <td class="reasons-preview">${escapeHtml(formatReasons(row.reasonsJson))}</td>
+          </tr>`;
+        })
+        .join('');
+
+      dbContent.innerHTML = `<div class="db-table-wrap"><table class="db-table">${head}<tbody>${body}</tbody></table></div>`;
+      dbContent.classList.remove('hidden');
+    }
+
+    async function loadDbRows() {
+      setDbFeedback('Chargement en cours…', '');
+      if (dbRefreshBtn) dbRefreshBtn.disabled = true;
+
+      try {
+        const headers = { Accept: 'application/json' };
+        const readKey = readKeyInput && readKeyInput.value ? readKeyInput.value.trim() : '';
+        if (readKey) headers['x-read-key'] = readKey;
+        const res = await fetch('/api/entries', {
+          method: 'GET',
+          headers,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `Lecture impossible (${res.status})`);
+        }
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+        renderDbRows(rows);
+        setDbFeedback(
+          rows.length
+            ? `${rows.length} ligne(s) chargée(s).`
+            : 'Connexion OK — aucune ligne.',
+          'ok'
+        );
+      } catch (err) {
+        setDbFeedback(
+          err.message ||
+            'Impossible de joindre l’API. Lance `npm run dev` ou vérifie DATABASE_URL.',
+          'err'
+        );
+      } finally {
+        if (dbRefreshBtn) dbRefreshBtn.disabled = false;
+      }
+    }
+
+    if (dbRefreshBtn) dbRefreshBtn.addEventListener('click', () => void loadDbRows());
+
+    loadDbRows();
+  </script>
+</body>
+</html>

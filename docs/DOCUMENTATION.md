@@ -41,7 +41,7 @@ Outil web léger qui :
 │       └──►  public/script.js                                        │
 │              ├── Heuristiques (analyzeProfile)                      │
 │              ├── POST /api/submissions  ──── Save to database       │
-│              └── GET  /api/submissions  ──── Show stored entries    │
+│              └── GET  /api/entries      ──── Show stored entries    │
 └──────────────────────────────┬─────────────────────────────────────┘
                                │ HTTPS
                                ▼
@@ -90,10 +90,10 @@ Outil web léger qui :
 [6] (Optionnel) Clic sur « Show stored entries » en bas de page
         │
         ▼
-[7] GET /api/submissions   →  Prisma  →  SELECT … ORDER BY created_at DESC LIMIT 200
+[7] GET /api/entries       →  Prisma  →  SELECT … ORDER BY created_at DESC LIMIT 200
         │
         ▼
-[8] Rendu en tableau dans la même page
+[8] Rendu en tableau sur la page <code>/entries</code>
 ```
 
 ---
@@ -113,7 +113,8 @@ rainbowsixsiege-suspect-tracker/
 │   └── DOCUMENTATION.md     ← Ce document (soutenance / onboarding)
 │
 ├── api/
-│   └── submissions.js       ← Serverless Function : POST (insert) + GET (list)
+│   ├── submissions.js       ← Serverless Function : POST (insert)
+│   └── entries.js           ← Serverless Function : GET (list)
 │
 ├── lib/
 │   ├── prisma.ts            ← Client Prisma pour Next.js (lib/prisma)
@@ -153,7 +154,7 @@ Trois sections principales dans `<main>` :
    - Pseudo (optionnel)
    - K/D ranked, Win rate %, Ranked matches, Niveau, Saisons (cases dynamiques générées par JS), Rang.
 3. **`#result-section`** — verdict + scores + raisons + bloc « Save to database ».
-4. **`#db-section`** — viewer BDD avec les boutons **Show stored entries / Refresh / Hide** et la table des sauvegardes.
+4. **`#db-section`** — lien vers la page <code>/entries</code> pour consulter les analyses sauvegardées.
 
 ### 4.2 `public/styles.css`
 Thème **editorial-noir** :
@@ -194,38 +195,38 @@ const SMURF_GAP_SEASONS = 4;       // gap ≥ 4 saisons sautées → smurf signa
 - Contient un input `password` (clé optionnelle `SAVE_API_KEY`) et le bouton.
 - Envoie un `POST /api/submissions` avec `Content-Type: application/json` et l'en-tête `x-save-key` si une clé est saisie.
 
-### 4.5 Bloc « Show stored entries » (viewer in-page)
-- Bouton en bas de page (`#db-load-btn`).
-- Au clic → `fetch('/api/submissions')` (GET).
-- Rendu d'un tableau (date, pseudo, KD, WR, ranked, niveau, rang, saisons, verdict, scores, aperçu des raisons).
-- Boutons **Refresh** et **Hide** pour relancer ou masquer.
+### 4.5 Page « Show stored entries » (<code>public/entries.html</code>)
+- Accessible via le lien en bas de la page d'accueil.
+- Au chargement → `fetch('/api/entries')` (GET).
+- Affiche un tableau dédié (date, pseudo, KD, WR, ranked, niveau, rang, saisons, verdict, scores, aperçu des raisons).
+- Bouton **Refresh** pour recharger les données.
 
 ---
 
-## 5. API — `api/submissions.js`
+## 5. API
 
-C'est une **Vercel Serverless Function** Node (CommonJS) qui répond sur `/api/submissions`.
+### 5.1 `api/submissions.js`
 
-### 5.1 Méthodes
+**Vercel Serverless Function** Node (CommonJS) qui répond sur **`/api/submissions`**.
+
+#### Méthodes
 
 | Méthode | Rôle | Auth |
 |---------|------|------|
 | `OPTIONS` | Preflight CORS | — |
 | `POST`    | Insère une analyse | `x-save-key` requis si `SAVE_API_KEY` défini |
-| `GET`     | Liste les 200 dernières analyses | Public (lecture seule) |
 | `*`       | `405 Method Not Allowed` | — |
 
-### 5.2 Validation côté serveur
+#### Validation côté serveur
 - `DATABASE_URL` non vide et non placeholder.
 - Champs numériques convertis et vérifiés (`Number.isFinite`).
 - `playedSeasons` doit être un tableau d'entiers non vide.
 - `verdict` et `verdictLabel` requis (truncation `clampStr`).
 - `reasons` : tableau JSON arbitraire stocké tel quel dans `reasons_json`.
 
-### 5.3 Réponses standardisées
+#### Réponses standardisées
 ```js
 sendJson(res, 201, { ok: true, id, created_at });           // POST OK
-sendJson(res, 200, { ok: true, rows: [...] });              // GET  OK
 sendJson(res, 400, { error: 'Invalid …' });                 // payload KO
 sendJson(res, 401, { error: 'Invalid or missing save key' });
 sendJson(res, 503, { error: 'DATABASE_URL is empty …' });   // BDD non configurée
@@ -300,7 +301,7 @@ Prisma fournit :
 | Fichier | Pour qui ? | Pourquoi pas l'autre ? |
 |---------|------------|------------------------|
 | `lib/prisma.ts`     | Next.js (`app/page.tsx`) | TS, import via alias `@/lib/prisma`. |
-| `lib/node-prisma.js` | `api/submissions.js` (CommonJS) | **Évite que `@/lib/prisma` résolve sur le `.js`** dans Next, ce qui casserait la propriété `suspectSubmission` (camelCase typée par Prisma). |
+| **`node-prisma.js`** | `api/*.js` (CommonJS) | **Évite que `@/lib/prisma` résolve sur le `.js`** dans Next, ce qui casserait la propriété `suspectSubmission` (camelCase typée par Prisma). |
 
 Les deux exposent un **singleton** stocké sur `globalThis` pour ne pas ouvrir plusieurs pools Postgres en serverless.
 
@@ -337,7 +338,9 @@ DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 ### 8.2 Structure compatible
 ```
 /                       → fichiers dans public/ (mêmes URL : /index.html, /styles.css, …)
+/entries                → public/entries.html (page des analyses sauvegardées)
 /api/submissions        → api/submissions.js (Node serverless, runtime auto)
+/api/entries            → api/entries.js   (Node serverless, runtime auto)
 /_next                  → (uniquement si on déploie Next.js en parallèle)
 ```
 
@@ -396,6 +399,7 @@ npm run dev
 # ► Mini serveur Node :
 #   - sert public/ à la racine des URL (/, index.html, styles.css, script.js, music_bg.mp3)
 #   - route /api/submissions vers api/submissions.js
+#   - route /api/entries vers api/entries.js
 # ► http://localhost:3000
 ```
 
@@ -466,7 +470,7 @@ npm run next:dev                  # ► http://localhost:3001
 1. **Intro (1 min)** — montrer la page, expliquer le contexte (R6 ranked, problème de cheat/smurf).
 2. **Démo formulaire (2 min)** — saisir un profil clean, puis un profil suspect, montrer les deux verdicts.
 3. **Sous le capot du JS (1 min)** — ouvrir `public/script.js`, montrer `analyzeProfile()` et la composition des scores.
-4. **Sauvegarde BDD (2 min)** — cliquer « Save to database », ouvrir la console Neon pour voir la ligne, puis revenir sur la page et cliquer « Show stored entries ».
+4. **Sauvegarde BDD (2 min)** — cliquer « Save to database », ouvrir la console Neon pour voir la ligne, puis cliquer « Show stored entries » pour ouvrir la page <code>/entries</code>.
 5. **Architecture (2 min)** — schéma de l'archi (Vercel statique + serverless + Postgres + Prisma).
 6. **Prisma + Vercel (1 min)** — montrer `schema.prisma`, expliquer pourquoi deux clients (`lib/prisma.ts` + `lib/node-prisma.js`).
 7. **Conclusion (1 min)** — limites + pistes d'évolution + questions.
@@ -514,7 +518,7 @@ npm run next:dev                  # ► http://localhost:3001
 | **`.env.example`** | Modèle des variables d’environnement (`DATABASE_URL`, `SAVE_API_KEY`) — valeurs factices, sûr à versionner. |
 | **`.env.local`** | *(non versionné)* Secrets réels en local : copie de `.env.example` avec ta vraie `DATABASE_URL`. Lu par `dotenv` dans `local-dev.cjs` et par Next/Prisma selon le contexte. |
 | **`.gitignore`** | Fichiers à ne pas committer (`node_modules`, `.next`, `.env*`, `.vercel`, logs). |
-| **`next.config.ts`** | Configuration Next.js (ici vide = défauts). |
+| **`next.config.ts`** | Configuration Next.js : headers sécurité globaux (CSP, HSTS, anti-clickjacking, referrer policy, permissions policy). |
 | **`tsconfig.json`** | Options TypeScript (chemins `@/*`, cibles de compilation pour l’app Next). |
 | **`next-env.d.ts`** | Fichier généré par Next — déclarations de types pour l’environnement (ne pas éditer à la main en général). |
 
@@ -522,16 +526,18 @@ npm run next:dev                  # ► http://localhost:3001
 
 | Fichier | Rôle |
 |---------|------|
-| **`index.html`** | Page principale : intro, formulaire de stats, zone résultat, bloc « Save to database », section « Stored in database » (consultation BDD), références aux assets. |
+| **`index.html`** | Page principale : intro, formulaire de stats, zone résultat, bloc « Save to database », lien vers la page des entrées, références aux assets. |
+| **`entries.html`** | Page dédiée : affiche les analyses sauvegardées depuis PostgreSQL (table <code>suspect_submissions</code>). |
 | **`styles.css`** | Thème visuel (typo, couleurs, ambiance grain/scanlines, formulaire, verdicts, barres de score, viewer BDD, bouton audio). |
-| **`script.js`** | Heuristiques (`analyzeProfile`), saisons, validation, affichage résultat, `POST`/`GET /api/submissions`, audio d’ambiance. |
+| **`script.js`** | Heuristiques (`analyzeProfile`), saisons, validation, affichage résultat, `POST /api/submissions`, `GET /api/entries`, audio d’ambiance. |
 | **`music_bg.mp3`** | Piste lue en boucle (faible volume) après action utilisateur sur le toggle audio. |
 
 ### `api/`
 
 | Fichier | Rôle |
 |---------|------|
-| **`submissions.js`** | **Vercel Serverless Function** (CommonJS) exposée en **`/api/submissions`** : `POST` insertion d’une analyse via Prisma, `GET` liste des 200 dernières lignes, `OPTIONS` CORS, validation `DATABASE_URL`, option `SAVE_API_KEY` pour le POST. |
+| **`submissions.js`** | **Vercel Serverless Function** (CommonJS) exposée en **`/api/submissions`** : `POST` insertion d’une analyse via Prisma, `OPTIONS` CORS, validation `DATABASE_URL`, option `SAVE_API_KEY`. |
+| **`entries.js`** | **Vercel Serverless Function** (CommonJS) exposée en **`/api/entries`** : `GET` liste des 200 dernières lignes, `OPTIONS` CORS, validation `DATABASE_URL`. |
 
 ### `app/` (Next.js — App Router)
 
@@ -565,7 +571,7 @@ npm run next:dev                  # ► http://localhost:3001
 
 | Fichier | Rôle |
 |---------|------|
-| **`local-dev.cjs`** | Serveur HTTP local pour **`npm run dev`** : sert le dossier **`public/`** aux URL racine (`/`, fichiers CSS/JS/MP3) et délègue **`/api/submissions`** au même handler que Vercel, avec lecture du corps JSON et chargement de `.env.local`. |
+| **`local-dev.cjs`** | Serveur HTTP local pour **`npm run dev`** : sert le dossier **`public/`** aux URL racine (`/`, fichiers CSS/JS/MP3), route **`/entries`** vers `public/entries.html`, et délègue **`/api/submissions`** et **`/api/entries`** aux mêmes handlers que Vercel, avec lecture du corps JSON et chargement de `.env.local`. |
 
 ### Dossiers générés / machine locale (souvent absents du dépôt Git)
 
@@ -576,4 +582,4 @@ npm run next:dev                  # ► http://localhost:3001
 | **`.vercel/`** | Config locale du CLI Vercel après `npx vercel` (projet lié, tokens — ne pas partager). |
 | **`node_modules/.prisma/`** | Client Prisma **généré** par `prisma generate` (`postinstall`). |
 
-> **Résumé** : l’interface utilisateur principale est dans **`public/`** (`index.html`, `styles.css`, `script.js`) ; la **persistance** passe par **`api/submissions.js`** + **Prisma** + **`prisma/schema.prisma`** ; **Next** (`app/`) est une **page d’historique optionnelle** ; **`scripts/local-dev.cjs`** reproduit localement le couple statique + API sans déployer ; la doc longue est dans **`docs/DOCUMENTATION.md`**.
+> **Résumé** : l’interface utilisateur principale est dans **`public/`** (`index.html`, `styles.css`, `script.js`) ; la **persistance** passe par **`api/submissions.js`** / **`api/entries.js`** + **Prisma** + **`prisma/schema.prisma`** ; **Next** (`app/`) est une **page d’historique optionnelle** ; **`scripts/local-dev.cjs`** reproduit localement le couple statique + API sans déployer ; la doc longue est dans **`docs/DOCUMENTATION.md`**.

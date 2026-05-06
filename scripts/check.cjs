@@ -1,0 +1,22 @@
+const { spawnSync } = require('child_process');
+
+const commands = [
+  ['node', ['-c', 'api/submissions.js']],
+  ['node', ['-c', 'api/entries.js']],
+  ['node', ['-c', 'scripts/local-dev.cjs']],
+  ['node', ['-c', 'prisma/seed.cjs']],
+  ['npm', ['run', 'db:validate']],
+  ['npm', ['run', 'build']],
+];
+
+for (const [cmd, args] of commands) {
+  const label = [cmd, ...args].join(' ');
+  console.log(`\n> ${label}`);
+  const result = spawnSync(cmd, args, { stdio: 'inherit', shell: true });
+  if (result.status !== 0) {
+    console.error(`\nCheck failed: ${label}`);
+    process.exit(result.status || 1);
+  }
+}
+
+console.log('\nAll checks passed.');

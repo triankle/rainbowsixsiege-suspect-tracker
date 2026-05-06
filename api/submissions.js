@@ -22,19 +22,28 @@ function clampStr(s, max) {
 
 function sendJson(res, statusCode, obj) {
   res.statusCode = statusCode;
+  setSecurityHeaders(res);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(obj));
 }
 
 function sendEmpty(res, statusCode) {
   res.statusCode = statusCode;
+  setSecurityHeaders(res);
   res.end();
+}
+
+function setSecurityHeaders(res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 }
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
       'Content-Type, x-save-key'
@@ -42,11 +51,16 @@ module.exports = async function handler(req, res) {
     return sendEmpty(res, 204);
   }
 
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
   const saveSecret = process.env.SAVE_API_KEY;
+  if (process.env.NODE_ENV === 'production' && !saveSecret) {
+    return sendJson(res, 503, {
+      error: 'SAVE_API_KEY must be configured in production.',
+    });
+  }
   if (req.method === 'POST' && saveSecret && String(saveSecret).length > 0) {
     const sent = req.headers['x-save-key'];
     if (sent !== saveSecret) {
@@ -66,36 +80,6 @@ module.exports = async function handler(req, res) {
       error:
         'DATABASE_URL is still the example value. Replace it with the real URI from Neon / Supabase / etc.',
     });
-  }
-
-  if (req.method === 'GET') {
-    try {
-      const prisma = getPrisma();
-      const rows = await prisma.suspectSubmission.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
-      const safe = rows.map((r) => ({
-        id: r.id,
-        createdAt: r.createdAt,
-        pseudo: r.pseudo,
-        kd: r.kd != null ? Number(r.kd) : null,
-        winrate: r.winrate != null ? Number(r.winrate) : null,
-        rankedMatches: r.rankedMatches,
-        accountLevel: r.accountLevel,
-        rankKey: r.rankKey,
-        seasonsPlayed: r.seasonsPlayed,
-        verdict: r.verdict,
-        verdictLabel: r.verdictLabel,
-        cheatScore: r.cheatScore != null ? Number(r.cheatScore) : null,
-        smurfScore: r.smurfScore != null ? Number(r.smurfScore) : null,
-        reasonsJson: r.reasonsJson,
-      }));
-      return sendJson(res, 200, { ok: true, rows: safe });
-    } catch (err) {
-      console.error('submissions list error', err.message);
-      return sendJson(res, 500, { error: 'Database error' });
-    }
   }
 
   const raw =

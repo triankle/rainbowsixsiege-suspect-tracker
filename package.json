@@ -4,7 +4,8 @@
   "description": "R6 suspect checker: static UI in public/ + Vercel serverless API + optional Next + PostgreSQL",
   "scripts": {
     "dev": "node scripts/local-dev.cjs",
-    "build": "prisma generate && next build",
+    "check": "node scripts/check.cjs",
+    "build": "next build",
     "next:dev": "next dev -p 3001",
     "next:build": "prisma generate && next build",
     "postinstall": "prisma generate",
@@ -12,10 +13,12 @@
     "db:validate": "dotenv -e .env.example -- prisma validate",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:pull": "dotenv -e .env.local -- prisma db pull",
-    "vercel-build": "prisma generate"
+    "db:seed": "dotenv -e .env.local -- node prisma/seed.cjs",
+    "vercel-build": "prisma generate && next build"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "@netlify/plugin-nextjs": "^5.13.2",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
