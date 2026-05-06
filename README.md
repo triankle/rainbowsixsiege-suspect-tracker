@@ -154,7 +154,7 @@ Le seed nécessite une `DATABASE_URL` valide dans `.env.local` et sert uniquemen
 L’architecture actuelle est **compatible Vercel** :
 
 - Les fichiers statiques sont dans **`public/`** : Next.js les expose à la racine des URL (`/index.html`, `/styles.css`, …) ; **`npm run dev`** sert aussi ce dossier à la racine.
-- Le dossier **`api/`** devient des **Serverless Functions** (`/api/submissions`, `/api/entries`).
+- Le dossier **`api/`** devient des **Serverless Functions** (`/api/submissions`, `/api/entries`, `/api/stats`).
 
 Étapes typiques :
 
@@ -163,7 +163,7 @@ L’architecture actuelle est **compatible Vercel** :
 3. Dans **Project → Settings → Environment Variables**, ajouter `DATABASE_URL`, `SAVE_API_KEY` et `READ_API_KEY`.
 4. Redéployer.
 
-Le workflow GitHub Actions `.github/workflows/ci.yml` installe les dépendances, valide le schéma Prisma et lance le build à chaque push ou pull request vers `main`. Sur Vercel, un push sur `main` peut ensuite déclencher le déploiement automatique du projet lié.
+Le workflow GitHub Actions `.github/workflows/ci.yml` installe les dépendances, valide le schéma Prisma, exécute les tests unitaires et lance le build à chaque push ou pull request vers `main`. Sur Vercel, un push sur `main` peut ensuite déclencher le déploiement automatique du projet lié.
 
 En local, **`vercel dev`** démarre le même routage que en prod (statique + `/api/*`) et lit `.env.local` (copie `.env.example` → `.env.local`).
 
@@ -190,9 +190,16 @@ npm run dev
 
 Alternative : `npx vercel dev` si tu préfères le même runtime que en production.
 
+## Tests
+
+```bash
+npm test          # Jest — 22 tests unitaires sur le moteur d'analyse
+npm run check     # Vérifie syntaxe, Prisma, tests et build en une seule commande
+```
+
 ## Page Next.js (historique en base)
 
-- **`app/page.tsx`** — Server Component : lit **`suspect_submissions`** avec Prisma et affiche un tableau (jusqu’à 200 lignes).
+- **`app/page.tsx`** — Server Component : lit **`suspect_submissions`** avec Prisma et affiche un tableau.
 - **`npm run next:dev`** — lance Next sur **http://localhost:3001** ; l’outil formulaire est aussi disponible en **`http://localhost:3001/index.html`** (fichiers `public/`). Pour API + statique comme en prod Vercel, préfère **`npm run dev`** (port **3000**) ou **`npx vercel dev`**.
 - Next charge automatiquement **`.env.local`** pour **`DATABASE_URL`**.
 

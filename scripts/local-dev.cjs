@@ -1,5 +1,5 @@
 /**
- * Local dev: serves static files from public/ + /api/submissions + /api/entries (loads .env.local).
+ * Local dev: serves static files from public/ + /api/submissions + /api/entries + /api/stats (loads .env.local).
  * Usage: npm run dev → http://localhost:3000
  */
 const http = require('http');
@@ -10,6 +10,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const submissionsHandler = require(path.join(__dirname, '..', 'api', 'submissions.js'));
 const entriesHandler = require(path.join(__dirname, '..', 'api', 'entries.js'));
+const statsHandler = require(path.join(__dirname, '..', 'api', 'stats.js'));
 const staticRoot = path.join(__dirname, '..', 'public');
 
 const MIME = {
@@ -98,6 +99,25 @@ const server = http.createServer(async (req, res) => {
     };
     try {
       await entriesHandler(mockReq, res);
+    } catch (e) {
+      console.error(e);
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: 'Server error' }));
+      }
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/stats') {
+    const mockReq = {
+      method: req.method,
+      headers: req.headers,
+      body: {},
+    };
+    try {
+      await statsHandler(mockReq, res);
     } catch (e) {
       console.error(e);
       if (!res.writableEnded) {
