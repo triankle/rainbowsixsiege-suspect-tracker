@@ -1,214 +1,223 @@
-# R6 Suspect Check
-Site web pour estimer si un profil Rainbow Six Siege est **suspect (triche)** ou **type smurf**, à partir des stats qu’on peut voir sur [R6 Tracker](https://r6.tracker.network/).
+﻿# R6 Suspect Check
+
+![CI](https://github.com/triankle/rainbowsixsiege-suspect-tracker/actions/workflows/ci.yml/badge.svg)
+
+R6 Suspect Check aide à repérer les profils Rainbow Six Siege qui méritent une vérification manuelle à partir de statistiques ranked copiées depuis R6 Tracker. L'application distingue les signaux **cheat-like**, **smurf-like** et **profil propre**, puis permet de sauvegarder les analyses dans PostgreSQL.
 
 ## Démo en ligne
 
 Application déployée : https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app
 
+Compte de démonstration : aucun compte utilisateur n'est nécessaire. Pour tester la sauvegarde et la lecture en production, utiliser les clés configurées dans Vercel (`SAVE_API_KEY` et `READ_API_KEY`).
+
+## Captures d'écran
+
+Les captures peuvent être ajoutées dans `docs/screenshots/` avant la soutenance :
+
+- `docs/screenshots/home.png` — formulaire principal d'analyse.
+- `docs/screenshots/result.png` — résultat d'une analyse.
+- `docs/screenshots/entries.png` — historique PostgreSQL.
+
 ## Spécifications fonctionnelles
 
-### Objectif
+### Pitch
 
-R6 Suspect Check aide un joueur ou un modérateur à analyser rapidement un profil Rainbow Six Siege à partir de statistiques ranked copiées depuis R6 Tracker. L'outil ne prouve pas la triche : il produit une estimation indicative séparant les signaux **cheat-like**, **smurf-like** et **profil propre**.
+Les joueurs et modérateurs R6 perdent du temps à interpréter des profils ranked ambigus. R6 Suspect Check transforme quelques statistiques visibles sur R6 Tracker en verdict argumenté, sauvegardable et consultable en ligne.
 
-### Cas d'usage principaux
+### Personae cibles
 
-1. **Analyser un profil ranked**
-   - L'utilisateur saisit le pseudo optionnel, le K/D ranked, le win rate ranked, le nombre de matchs ranked, le niveau du compte, le rang actuel et les saisons jouées.
-   - Le formulaire bloque les profils incohérents, par exemple un niveau inférieur à 50 ou aucune saison cochée.
-   - L'application calcule un verdict, un score de suspicion, un score smurf, une classification et une liste de raisons explicites.
-
-2. **Sauvegarder une analyse**
-   - Après l'analyse, l'utilisateur peut enregistrer le résultat dans PostgreSQL via `POST /api/submissions`.
-   - Si `SAVE_API_KEY` est configurée côté serveur, l'utilisateur doit fournir la clé de sauvegarde.
-
-3. **Consulter l'historique**
-   - Le lien **Show stored entries** ouvre `/entries`.
-   - La page dédiée charge les analyses sauvegardées via `GET /api/entries` et affiche un tableau filtrable visuellement par colonnes.
-   - Si `READ_API_KEY` est configurée côté serveur, l'utilisateur doit fournir la clé de lecture.
+- **Joueur ranked** : veut savoir si un adversaire paraît suspect avant de signaler trop vite.
+- **Modérateur de communauté** : veut centraliser des analyses rapides pendant une vérification manuelle.
+- **Évaluateur projet** : veut tester un parcours complet frontend, API, base de données et déploiement.
 
 ### MVP
 
-Le MVP est complet si l'utilisateur peut :
+1. En tant que joueur ranked, je veux saisir les statistiques d'un profil afin d'obtenir un score de suspicion compréhensible.
+2. En tant que joueur ranked, je veux voir les raisons du verdict afin de comprendre les signaux retenus.
+3. En tant que modérateur, je veux sauvegarder une analyse afin de conserver une trace dans PostgreSQL.
+4. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
+5. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base de données est connectée.
 
-- saisir manuellement les statistiques ranked ;
-- obtenir un verdict argumenté sans recharger la page ;
-- sauvegarder une analyse dans PostgreSQL ;
-- consulter les analyses sauvegardées sur `/entries` ;
-- lancer le projet localement avec `npm run dev`.
+### Out of scope
 
-### Hors périmètre assumé
+- L'application ne prouve pas une triche : elle produit uniquement une aide à la décision.
+- L'application ne scrape pas R6 Tracker et n'utilise pas d'API Ubisoft privée.
+- L'application ne gère pas de comptes utilisateurs, rôles ou sessions.
+- L'application ne remplace pas une investigation humaine ou une preuve vidéo.
+- L'application ne stocke pas de données personnelles sensibles.
 
-- Pas de preuve de triche automatisée.
-- Pas de scraping R6 Tracker : le site bloque les accès automatisés et l'API publique n'est pas disponible sans accord/clé adaptée.
-- Pas de comptes utilisateurs : l'application utilise une clé optionnelle `SAVE_API_KEY` pour protéger l'écriture.
+### Parcours utilisateur principal
+
+1. Ouvrir `/` ou `/index.html` sur l'URL Vercel.
+2. Renseigner le pseudo optionnel, K/D, win rate, matchs ranked, niveau, rang et saisons jouées.
+3. Lire le verdict, les scores et les raisons détaillées affichés dans la page.
+4. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
+5. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
+6. Ouvrir `/api/stats` pour vérifier les statistiques agrégées de la base.
 
 ## Architecture
 
-```text
-Navigateur
-  ├─ public/index.html + public/script.js
-  │    ├─ validation formulaire
-  │    ├─ analyse heuristique locale
-  │    └─ POST /api/submissions
-  │
-  └─ public/entries.html ou app/entries/page.tsx
-       └─ GET /api/entries
-
-API serverless Vercel / serveur local
-  ├─ api/submissions.js  → validation + insertion Prisma
-  └─ api/entries.js      → lecture Prisma
-
-Couche données
-  ├─ lib/node-prisma.js / lib/prisma.ts
-  ├─ prisma/schema.prisma
-  └─ PostgreSQL : suspect_submissions
+```mermaid
+graph LR
+  U[Utilisateur navigateur] -->|HTTPS| F[Frontend statique public/index.html sur Vercel]
+  F -->|JS local| H[Moteur heuristique lib/analyze.js]
+  F -->|POST JSON + x-save-key| S[/api/submissions Serverless Node.js]
+  F -->|GET + x-read-key| E[/api/entries Serverless Node.js]
+  U -->|GET| N[Next.js App Router /entries]
+  U -->|GET| A[/api/stats Serverless Node.js]
+  S -->|Prisma ORM| P[(PostgreSQL Neon)]
+  E -->|Prisma ORM| P
+  A -->|Prisma aggregate/groupBy| P
+  N -->|Prisma ORM| P
 ```
 
 ### Choix techniques
 
-**HTML/CSS/JavaScript vanilla (`public/`)** : l'outil principal est volontairement léger et directement servable par Vercel ou par le serveur local. Cela limite la complexité côté client et rend le formulaire utilisable même sans hydration React.
+**HTML/CSS/JavaScript vanilla** — Le formulaire principal reste très léger, rapide à charger et facile à démontrer sans hydration complexe. L'alternative aurait été une SPA React complète, plus structurée mais plus coûteuse à maintenir pour un MVP centré sur un seul écran. L'inconvénient assumé est une componentisation plus faible.
 
-**Next.js App Router (`app/`)** : Next fournit une compatibilité Vercel propre, une page server-rendered pour l'historique et une base évolutive si l'application doit ensuite intégrer plus de pages.
+**Next.js 15** — Next.js permet d'héberger proprement le projet sur Vercel, de servir les fichiers `public/` et d'ajouter des pages App Router comme `/entries`. Une app Express séparée aurait été plus contrôlable mais aurait demandé un hébergement backend dédié. L'inconvénient est une architecture hybride entre statique et App Router.
 
-**API serverless Vercel (`api/`)** : les endpoints `submissions` et `entries` isolent l'accès base de données du navigateur. Le front ne manipule jamais directement la chaîne PostgreSQL.
+**Vercel Serverless Functions** — Les fichiers `api/*.js` deviennent des endpoints HTTPS sans serveur à administrer. Render ou Railway auraient aussi fonctionné, mais Vercel donne le déploiement automatique depuis GitHub. La limite est le modèle serverless : cold starts possibles et temps d'exécution encadré.
 
-**Prisma** : Prisma évite le SQL concaténé, fournit un modèle typé côté Next et centralise l'accès à PostgreSQL via `SuspectSubmission`.
+**Prisma** — Prisma évite les requêtes SQL concaténées, simplifie les accès typés et réduit le risque d'injection SQL. Une approche SQL manuelle aurait donné plus de contrôle sur les index et migrations. L'inconvénient est une dépendance ORM et un client à générer au build.
 
-**PostgreSQL** : le projet stocke des analyses structurées avec scores numériques, tableau de saisons jouées et JSON de raisons. PostgreSQL est adapté aux requêtes d'historique et au stockage durable.
+**PostgreSQL Neon** — Neon fournit une base PostgreSQL managée gratuite adaptée au stockage durable des analyses. SQLite aurait été plus simple en local, mais moins adapté au déploiement serverless. L'inconvénient est la dépendance réseau et le besoin de gérer `DATABASE_URL`.
 
-**Serveur local Node (`scripts/local-dev.cjs`)** : il reproduit localement le routage statique + API sans dépendre de Vercel CLI, ce qui facilite les tests en soutenance.
+**Zod** — Zod centralise la validation serveur des body et query params. Une validation manuelle aurait réduit les dépendances, mais elle devient vite incohérente entre endpoints. L'inconvénient est un coût d'apprentissage et quelques transformations explicites.
 
-## Structure du dépôt
+### Limites connues
 
-```
-├── public/              ← Outil principal (HTML, CSS, JS, musique) — servi à / en dev et par Next en prod
-├── api/                 ← Serverless Vercel : /api/submissions (POST) + /api/entries (GET)
-├── app/                 ← Next.js (App Router) — page / historique optionnelle
-├── lib/                 ← Client Prisma (Next + Node)
-├── prisma/              ← schéma Prisma + réexports
-├── db/                  ← schema.sql PostgreSQL
-├── scripts/             ← local-dev.cjs (npm run dev)
-├── docs/
-│   └── DOCUMENTATION.md ← doc soutenance (architecture, inventaire détaillé)
-├── package.json
-└── README.md
-```
+- Le frontend principal n'est pas encore découpé en composants React réutilisables.
+- La CSP conserve `unsafe-inline` pour rester compatible avec le HTML statique actuel.
+- Le projet n'a pas d'authentification utilisateur complète, seulement des clés API de démonstration.
+- Il n'y a pas de domaine personnalisé ; le TLS est fourni par Vercel sur `vercel.app`.
+- Les heuristiques sont explicables mais ne sont pas un modèle statistique entraîné.
 
-## Critères utilisés
+## Stack
 
-- **Suspicion triche** : K/D très élevé avec peu de parties, win rate très haut avec peu de jeux.
-- **Smurf** : rang élevé avec niveau compte bas, peu de parties pour le rang, peu de saisons jouées.
-- **Profil propre** : beaucoup de parties, plusieurs saisons, K/D dans la norme.
-
-## Fichiers utiles
-
-- `public/index.html` — structure de la page (formulaire + zone résultat + lien vers les entrées).
-- `public/entries.html` — page dédiée affichant les analyses sauvegardées.
-- `public/styles.css` — mise en forme (thème sombre type R6).
-- `public/script.js` — calcul des scores et affichage du résultat.
-- `api/submissions.js` — route serverless : enregistrement via **Prisma**.
-- `api/entries.js` — route serverless : lecture des entrées via **Prisma**.
-- `prisma/schema.prisma` — modèle `SuspectSubmission` ↔ table `suspect_submissions`.
-- `lib/prisma.ts` — client Prisma pour Next.js ; `lib/node-prisma.js` — `getPrisma()` pour `api/*.js` (évite le conflit de nom avec `@/lib/prisma`).
-- `db/schema.sql` — équivalent SQL à exécuter une fois sur Neon si tu n’utilises pas `db push`.
-- `package.json` — scripts `db:*` et génération du client au `npm install`.
-- `docs/DOCUMENTATION.md` — documentation détaillée pour soutenance / onboarding.
-
-## Sauvegarde PostgreSQL (optionnelle)
-
-Après une analyse, un bloc **Save to database** permet d’envoyer les champs + scores à une API. Il faut :
-
-1. Créer une base PostgreSQL (Neon, Supabase, Vercel Postgres, etc.).
-2. Exécuter `db/schema.sql` sur cette base.
-3. Définir la variable d’environnement **`DATABASE_URL`** là où l’API tourne (voir Vercel ci‑dessous).
-4. Optionnel : **`SAVE_API_KEY`** — si elle est définie, l’API exige l’en-tête `x-save-key` avec la même valeur ; le champ mot de passe sous le bouton sert à ça.
-5. Optionnel en local, recommandé en production : **`READ_API_KEY`** — protège `GET /api/entries` via l'en-tête `x-read-key`.
-
-## Prisma
-
-- Après **`npm install`**, **`prisma generate`** tourne automatiquement (`postinstall`) : le client est prêt pour l’API et pour Vercel (`vercel-build` = `prisma generate`).
-- **`npm run db:validate`** — vérifie le schéma (utilise `.env.example` pour une `DATABASE_URL` factice).
-- **`npm run db:push`** — pousse le schéma vers la base pointée par **`.env.local`** (alternative à exécuter `db/schema.sql` à la main). Ne lance pas ça sur une base de prod sans réfléchir aux effets.
-- **`npm run db:pull`** — met à jour `schema.prisma` depuis une base existante (introspection).
-
-Tu n’as **rien à refaire** si la table existe déjà : l’insertion **Save to database** utilise le même nom de table et les mêmes colonnes.
-
-## Données de démonstration
-
-Un seed Prisma est fourni pour remplir rapidement la table `suspect_submissions` avec trois profils de démonstration :
-
-```bash
-npm run db:seed
-```
-
-Le seed nécessite une `DATABASE_URL` valide dans `.env.local` et sert uniquement à tester l'historique en local ou en environnement de démonstration.
-
-## Sécurité
-
-- **XSS** : toutes les valeurs utilisateur réinjectées dans le DOM passent par `escapeHtml()` avant `innerHTML`.
-- **SQL injection** : l'application utilise Prisma (`create`, `findMany`) et ne concatène pas de requêtes SQL à partir de paramètres utilisateur.
-- **CSRF** : l'API n'utilise pas de cookie de session ; l'écriture est stateless et peut être protégée par l'en-tête `x-save-key` via `SAVE_API_KEY`.
-- **Autorisation lecture/écriture** : `SAVE_API_KEY` protège l'écriture et `READ_API_KEY` protège l'historique en production.
-- **Headers HTTP** : `next.config.ts` définit CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` et `Permissions-Policy`.
-- **Secrets** : `.env`, `.env.local` et `.env*.local` sont ignorés par Git ; seules les variables d'exemple doivent être versionnées.
-
-## Vercel : compatibilité et déploiement
-
-L’architecture actuelle est **compatible Vercel** :
-
-- Les fichiers statiques sont dans **`public/`** : Next.js les expose à la racine des URL (`/index.html`, `/styles.css`, …) ; **`npm run dev`** sert aussi ce dossier à la racine.
-- Le dossier **`api/`** devient des **Serverless Functions** (`/api/submissions`, `/api/entries`, `/api/stats`).
-
-Étapes typiques :
-
-1. Installer les deps : `npm install`
-2. Lier le projet : `npx vercel` (ou import du dépôt Git dans le dashboard Vercel).
-3. Dans **Project → Settings → Environment Variables**, ajouter `DATABASE_URL`, `SAVE_API_KEY` et `READ_API_KEY`.
-4. Redéployer.
-
-Le workflow GitHub Actions `.github/workflows/ci.yml` installe les dépendances, valide le schéma Prisma, exécute les tests unitaires et lance le build à chaque push ou pull request vers `main`. Sur Vercel, un push sur `main` peut ensuite déclencher le déploiement automatique du projet lié.
-
-En local, **`vercel dev`** démarre le même routage que en prod (statique + `/api/*`) et lit `.env.local` (copie `.env.example` → `.env.local`).
-
-Ouvrir seulement `public/index.html` en `file://` ne permet pas d’appeler `/api/submissions` ou `/api/entries` ; utilise `npm run dev`, `npx vercel dev` ou un déploiement.
+- Node.js `>=18`
+- Next.js `^15.1.6`
+- React `^19.0.0`
+- Prisma `^6.19.0`
+- PostgreSQL Neon
+- Zod `^4.4.3`
+- Jest `^30.3.0`
+- Vercel
+- GitHub Actions
 
 ## Lancer en local
 
-**Sans base de données** — page statique seule (API indisponible) :
+1. Cloner le dépôt.
+
+   ```bash
+   git clone https://github.com/triankle/rainbowsixsiege-suspect-tracker.git
+   cd rainbowsixsiege-suspect-tracker
+   ```
+
+2. Installer les dépendances.
+
+   ```bash
+   npm install
+   ```
+
+3. Créer l'environnement local.
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+4. Renseigner `DATABASE_URL` dans `.env.local` si la sauvegarde doit fonctionner.
+
+5. Préparer la base.
+
+   ```bash
+   npm run db:push
+   npm run db:seed
+   ```
+
+6. Lancer le serveur local.
+
+   ```bash
+   npm run dev
+   ```
+
+7. Ouvrir l'application.
+
+   ```text
+   http://localhost:3000
+   http://localhost:3000/entries
+   ```
+
+Alternative Next.js seule :
 
 ```bash
-cd public
-python -m http.server 8000
-# Puis http://localhost:8000
+npm run next:dev
 ```
 
-**Avec API + PostgreSQL** (recommandé si tu testes la sauvegarde) :
+## Variables d'environnement
 
-```bash
-npm install
-# Renseigne DATABASE_URL dans .env.local
-npm run dev
-# → http://localhost:3000 (racine = public/index.html + /entries + /api/submissions + /api/entries)
-```
-
-Alternative : `npx vercel dev` si tu préfères le même runtime que en production.
+| Nom | Rôle | Exemple | Requise |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Connexion PostgreSQL Neon/Supabase/Vercel Postgres | `postgresql://user:password@host/db?sslmode=require` | Oui pour API DB |
+| `SAVE_API_KEY` | Protège `POST /api/submissions` via `x-save-key` | `r6-save-long-random-key` | Oui en production |
+| `READ_API_KEY` | Protège `GET /api/entries` via `x-read-key` | `r6-read-long-random-key` | Oui en production |
 
 ## Tests
 
 ```bash
-npm test          # Jest — 22 tests unitaires sur le moteur d'analyse
-npm run check     # Vérifie syntaxe, Prisma, tests et build en une seule commande
+npm test
+npm run check
 ```
 
-## Page Next.js (historique en base)
+`npm run check` vérifie la syntaxe des endpoints et librairies, valide Prisma, exécute les tests Jest et lance le build Next.js.
 
-- **`app/page.tsx`** — Server Component : lit **`suspect_submissions`** avec Prisma et affiche un tableau.
-- **`npm run next:dev`** — lance Next sur **http://localhost:3001** ; l’outil formulaire est aussi disponible en **`http://localhost:3001/index.html`** (fichiers `public/`). Pour API + statique comme en prod Vercel, préfère **`npm run dev`** (port **3000**) ou **`npx vercel dev`**.
-- Next charge automatiquement **`.env.local`** pour **`DATABASE_URL`**.
+## Documentation complémentaire
 
-Build production Next : **`npm run next:build`**.
+- [Documentation API](docs/API.md)
+- [Documentation base de données](docs/DB.md)
+- [Documentation sécurité](docs/SECURITY.md)
+- [Documentation soutenance détaillée](docs/DOCUMENTATION.md)
 
----
+## Choix techniques
 
-*Stats à saisir manuellement depuis R6 Tracker. Résultat à titre indicatif uniquement.*
+Le projet privilégie un MVP déployable et explicable : formulaire statique pour l'expérience principale, serverless Vercel pour les endpoints, Prisma pour l'accès aux données et Neon pour PostgreSQL managé. La logique métier d'analyse est séparée dans `lib/analyze.js` afin de pouvoir être testée indépendamment du DOM. Les réponses API ont été renforcées avec validation Zod et erreurs JSON normalisées pour faciliter le débogage et la soutenance.
+
+## Workflow Git recommandé
+
+Le workflow cible pour les prochains chantiers est :
+
+1. `main` reste la branche de production.
+2. `dev` sert de branche d'intégration.
+3. Chaque évolution part de `dev` via `feature/<nom>`.
+4. Toute fusion vers `dev` ou `main` passe par Pull Request.
+5. La CI doit être verte avant merge.
+
+Le template de PR est disponible dans `.github/pull_request_template.md`.
+
+## Déploiement
+
+- Frontend, Next.js et fonctions API : Vercel.
+- Base de données : Neon PostgreSQL.
+- Variables de production : Vercel Environment Variables.
+- Déploiement automatique : push sur `main` après CI verte.
+
+## Sécurité
+
+- Validation serveur via Zod.
+- Accès base via Prisma, sans concaténation SQL.
+- Secrets hors repo via Vercel Environment Variables.
+- Headers HTTP globaux dans `next.config.ts`.
+- Scan Gitleaks dans GitHub Actions.
+- Lecture/écriture protégées par clés API en production.
+
+## Limites connues
+
+- Pas de login utilisateur ni RBAC complet.
+- Pas de domaine custom pour le moment.
+- Pas d'intégration directe avec R6 Tracker.
+- Pas de modèle IA entraîné : l'analyse repose sur des règles heuristiques.
+- Les captures d'écran doivent être ajoutées manuellement avant rendu final si demandées.
+
+## License
+
+Projet pédagogique. Aucune licence open source formelle n'est définie pour le moment.

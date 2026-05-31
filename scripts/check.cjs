@@ -7,6 +7,8 @@ const commands = [
   ['node', ['-c', 'scripts/local-dev.cjs']],
   ['node', ['-c', 'prisma/seed.cjs']],
   ['node', ['-c', 'lib/analyze.js']],
+  ['node', ['-c', 'lib/api-response.js']],
+  ['node', ['-c', 'lib/validation.js']],
   ['npm', ['run', 'db:validate']],
   ['npm', ['test']],
   ['npm', ['run', 'build']],
