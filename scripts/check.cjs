@@ -9,6 +9,7 @@ const commands = [
   ['node', ['-c', 'lib/analyze.js']],
   ['node', ['-c', 'lib/api-response.js']],
   ['node', ['-c', 'lib/validation.js']],
+  ['node', ['-c', 'public/script.js']],
   ['npm', ['run', 'db:validate']],
   ['npm', ['test']],
   ['npm', ['run', 'build']],

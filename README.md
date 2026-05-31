@@ -34,9 +34,10 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 
 1. En tant que joueur ranked, je veux saisir les statistiques d'un profil afin d'obtenir un score de suspicion compréhensible.
 2. En tant que joueur ranked, je veux voir les raisons du verdict afin de comprendre les signaux retenus.
-3. En tant que modérateur, je veux sauvegarder une analyse afin de conserver une trace dans PostgreSQL.
-4. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
-5. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base de données est connectée.
+3. En tant que joueur ranked, je veux copier un rapport partageable afin de transmettre le résultat sans capture manuelle.
+4. En tant que modérateur, je veux sauvegarder une analyse afin de conserver une trace dans PostgreSQL.
+5. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
+6. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base de données est connectée.
 
 ### Out of scope
 
@@ -51,9 +52,10 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 1. Ouvrir `/` ou `/index.html` sur l'URL Vercel.
 2. Renseigner le pseudo optionnel, K/D, win rate, matchs ranked, niveau, rang et saisons jouées.
 3. Lire le verdict, les scores et les raisons détaillées affichés dans la page.
-4. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
-5. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
-6. Ouvrir `/api/stats` pour vérifier les statistiques agrégées de la base.
+4. Utiliser **Copy report** pour copier un rapport texte partageable.
+5. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
+6. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
+7. Ouvrir `/api/stats` pour vérifier les statistiques agrégées de la base.
 
 ## Architecture
 
@@ -176,6 +178,7 @@ npm run check
 - [Documentation API](docs/API.md)
 - [Documentation base de données](docs/DB.md)
 - [Documentation sécurité](docs/SECURITY.md)
+- [Workflow Git Flow](docs/GITFLOW.md)
 - [Documentation soutenance détaillée](docs/DOCUMENTATION.md)
 
 ## Choix techniques
