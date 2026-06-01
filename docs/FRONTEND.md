@@ -10,6 +10,10 @@ public/
   entries.html     — historique PostgreSQL
   tokens.css       — design tokens (couleurs, typo, spacing, radius, shadows)
   script.js        — logique d'analyse et UI (≈636 lignes)
+  scripts/
+    api-client.js  — client API centralisé pour /api/v1
+    report-utils.js — génération du rapport partageable
+    dom-utils.js   — helpers DOM isolés
   styles.css       — styles globaux (≈753 lignes)
   music_bg.mp3     — ambiance audio
 ```
@@ -39,9 +43,8 @@ Le fichier `public/tokens.css` centralise les décisions visuelles principales :
 - `onlyCurrentSeasonPlayed()` — détecte si seule saison courante.
 - `analyzeProfile()` — fonction principale d'analyse heuristique.
 - `displayResult()` — affiche le verdict et les scores.
-- `submitSaveToDb()` — POST vers `/api/submissions`.
-- `buildShareableReport()` — génère le rapport texte.
-- `copyShareableReport()` — copie dans le presse-papier.
+- `copyShareableReport()` — copie le rapport généré par `scripts/report-utils.js`.
+- `submitSaveToDb()` — utilise `scripts/api-client.js` pour sauvegarder via `/api/v1/submissions`.
 
 ## État actuel
 

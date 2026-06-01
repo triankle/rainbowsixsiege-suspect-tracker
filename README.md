@@ -8,7 +8,6 @@ R6 Suspect Check aide à repérer les profils Rainbow Six Siege qui méritent un
 
 Application déployée : https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app
 
-Compte de démonstration : aucun compte utilisateur n'est nécessaire. Pour tester la sauvegarde et la lecture en production, utiliser les clés configurées dans Vercel (`SAVE_API_KEY` et `READ_API_KEY`).
 
 ## Captures d'écran
 
@@ -180,6 +179,7 @@ npm run check
 - [Documentation sécurité](docs/SECURITY.md)
 - [Documentation frontend](docs/FRONTEND.md)
 - [Workflow Git Flow](docs/GITFLOW.md)
+- [Checklist release et soutenance](docs/RELEASE_CHECKLIST.md)
 - [Documentation soutenance détaillée](docs/DOCUMENTATION.md)
 
 ## Choix techniques

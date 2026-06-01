@@ -44,6 +44,7 @@
     <p>Template Datas from <a href="https://r6.tracker.network/" target="_blank" rel="noopener">r6.tracker.network</a>. Indicative only — not evidence of cheating.</p>
   </footer>
 
+  <script src="scripts/api-client.js"></script>
   <script>
     const dbContent = document.getElementById('db-content');
     const dbFeedback = document.getElementById('db-feedback');
@@ -151,17 +152,8 @@
       if (dbRefreshBtn) dbRefreshBtn.disabled = true;
 
       try {
-        const headers = { Accept: 'application/json' };
         const readKey = readKeyInput && readKeyInput.value ? readKeyInput.value.trim() : '';
-        if (readKey) headers['x-read-key'] = readKey;
-        const res = await fetch('/api/entries', {
-          method: 'GET',
-          headers,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data.error || `Lecture impossible (${res.status})`);
-        }
+        const data = await window.R6Api.listEntries({ readKey, limit: 20 });
         const rows = Array.isArray(data.rows) ? data.rows : [];
         renderDbRows(rows);
         setDbFeedback(
