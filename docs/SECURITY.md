@@ -8,7 +8,7 @@ R6 Suspect Check n'a pas de comptes publics multi-utilisateurs. Le modèle chois
 | --- | --- |
 | Enregistrer une analyse | Header `x-save-key` comparé à `SAVE_API_KEY`. |
 | Lire l'historique | Header `x-read-key` comparé à `READ_API_KEY`. |
-| Lire les statistiques | Public, uniquement agrégé. |
+| Lire les statistiques | Header `x-read-key` comparé à `READ_API_KEY` en production. |
 | Login admin | Mot de passe vérifié avec hash `scrypt` et JWT HMAC court. |
 | Lire `/api/v1/auth/me` | Header `Authorization: Bearer <token>`. |
 | Accéder à PostgreSQL | Impossible depuis le client ; `DATABASE_URL` reste côté serveur. |
@@ -47,9 +47,10 @@ Le projet fournit une authentification admin légère pour démontrer le critèr
 
 Les endpoints utilisent `zod` via `lib/validation.js` :
 
-- `submissionSchema` pour `POST /api/submissions`.
-- `entriesQuerySchema` pour `GET /api/entries`.
-- `emptyQuerySchema` pour `GET /api/stats`.
+- `analysisInputSchema` pour `POST /api/v1/analyze`.
+- `submissionSchema` pour `POST /api/v1/submissions`.
+- `entriesQuerySchema` pour `GET /api/v1/entries` et `GET /api/v1/export.csv`.
+- `emptyQuerySchema` pour `GET /api/v1/stats`.
 - `loginSchema` pour `POST /api/v1/auth/login`.
 
 Les erreurs de validation retournent un JSON normalisé avec `field`, `code` et `message`.
@@ -61,7 +62,10 @@ Les erreurs de validation retournent un JSON normalisé avec `field`, `code` et 
 - `AppError`
 - `ValidationError`
 - `AuthenticationError`
+- `AuthorizationError`
 - `ConfigurationError`
+- `ConflictError`
+- `NotFoundError`
 - `handleApiError()`
 
 En production, les erreurs internes sont masquées et ne renvoient pas de stacktrace au client.
@@ -82,7 +86,7 @@ L'application n'utilise pas de cookie de session. Les actions d'écriture repose
 
 ### Headers HTTP
 
-`next.config.ts` définit les headers globaux suivants :
+`next.config.ts` applique les headers globaux suivants via `headers()` :
 
 - `Content-Security-Policy`
 - `Strict-Transport-Security`
@@ -91,7 +95,7 @@ L'application n'utilise pas de cookie de session. Les actions d'écriture repose
 - `Referrer-Policy`
 - `Permissions-Policy`
 
-Les endpoints API ajoutent aussi les headers de base via `setSecurityHeaders()`.
+Les endpoints API ajoutent aussi les headers de base via `setSecurityHeaders()`, avec HSTS en production.
 
 ## CI sécurité
 

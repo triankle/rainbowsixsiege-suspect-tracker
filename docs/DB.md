@@ -43,6 +43,14 @@ erDiagram
 | `smurfScore` | `smurf_score` | `decimal(6,2)` | Non | Score smurf entre 0 et 100. |
 | `reasonsJson` | `reasons_json` | `json` | Non | Raisons détaillées générées par l'analyse. |
 
+## Index
+
+| Index | Colonnes | Rôle |
+| --- | --- | --- |
+| `suspect_submissions_created_at_idx` | `created_at DESC` | Tri par date dans l'historique. |
+| `suspect_submissions_verdict_idx` | `verdict` | Filtre par verdict. |
+| `suspect_submissions_rank_key_idx` | `rank_key` | Filtre par rang. |
+
 ## Contraintes et choix
 
 - La clé primaire est un UUID, ce qui évite d'exposer un compteur incrémental.
@@ -53,11 +61,12 @@ erDiagram
 
 ## Accès aux données
 
-Tous les accès applicatifs passent par Prisma :
+Tous les accès applicatifs passent par Prisma via `lib/repositories/submission-repository.js` :
 
-- `prisma.suspectSubmission.create()` pour `POST /api/submissions`.
-- `prisma.suspectSubmission.findMany()` et `count()` pour `GET /api/entries`.
-- `aggregate()` et `groupBy()` pour `GET /api/stats`.
+- `create()` pour `POST /api/v1/submissions`.
+- `findManyWithCount()` pour `GET /api/v1/entries`.
+- `findForExport()` pour `GET /api/v1/export.csv`.
+- `getStats()` pour `GET /api/v1/stats`.
 
 Aucune donnée utilisateur n'est concaténée dans une requête SQL brute.
 
@@ -69,7 +78,7 @@ Le script de démonstration est :
 npm run db:seed
 ```
 
-Il lit `DATABASE_URL` depuis `.env.local` et insère des profils représentatifs pour tester immédiatement l'historique et les statistiques.
+Il lit `DATABASE_URL` depuis `.env.local`, supprime les lignes de démonstration `Demo.*` existantes puis insère 5 profils représentatifs recalculés par `lib/analyze.js`. Le seed est donc idempotent : le relancer ne duplique pas les lignes de démonstration.
 
 ## Mise en place locale
 
@@ -77,6 +86,6 @@ Il lit `DATABASE_URL` depuis `.env.local` et insère des profils représentatifs
 cp .env.example .env.local
 npm install
 npm run db:push
-npm run db:seed
+npm run seed
 npm run dev
 ```

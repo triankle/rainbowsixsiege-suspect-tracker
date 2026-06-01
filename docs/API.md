@@ -1,238 +1,168 @@
 # Documentation API
 
-Base URL production : `https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app`
+Base production : `https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app`
 
-Version stable recommandée : `/api/v1`. Les anciennes routes `/api/*` restent disponibles comme alias de compatibilité.
+Toutes les routes sont servies par une seule fonction Vercel : `api/[...path].js`. La version stable est `/api/v1`.
 
-Toutes les réponses JSON récentes utilisent le format principal `{ data, meta? }` ou `{ error }`. Certains champs historiques (`ok`, `rows`, `id`) sont conservés pour compatibilité avec le frontend existant.
+## Format des réponses
+
+Succès :
+
+```json
+{ "data": {}, "meta": {} }
+```
+
+Erreur :
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "Invalid request input", "details": [] } }
+```
+
+Des champs historiques (`rows`, `id`, `created_at`) sont encore renvoyés sur certaines routes pour compatibilité frontend.
 
 ## Authentification
 
-L'application n'a pas de comptes utilisateurs. Les routes sensibles sont protégées par clés serveur injectées via variables d'environnement Vercel.
-
-| Clé | Header client | Usage |
+| Secret | Header | Routes |
 | --- | --- | --- |
-| `SAVE_API_KEY` | `x-save-key` | Autorise l'écriture d'une analyse. |
-| `READ_API_KEY` | `x-read-key` | Autorise la lecture de l'historique. |
-| `AUTH_USERNAME` + `AUTH_PASSWORD_HASH` + `AUTH_JWT_SECRET` | `Authorization: Bearer <token>` | Authentification admin JWT de démonstration. |
+| `SAVE_API_KEY` | `x-save-key` | `POST /api/v1/submissions` |
+| `READ_API_KEY` | `x-read-key` | `GET /api/v1/entries`, `GET /api/v1/export.csv`, `GET /api/v1/stats` |
+| `AUTH_JWT_SECRET` | `Authorization: Bearer <token>` | `GET /api/v1/auth/me` |
 
-## `POST /api/v1/auth/login`
+En production, `SAVE_API_KEY` et `READ_API_KEY` sont obligatoires pour les routes concernées.
 
-Authentifie l'administrateur configuré par variables d'environnement.
+## Inventaire REST
 
-```json
-{
-  "username": "admin",
-  "password": "Demo1234!Demo"
-}
+| Méthode | Path | But | Auth requise | Réponse 2xx | Erreurs |
+| --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/analyze` | Recalcule un verdict sans sauvegarder | Non | `200` | `400`, `405`, `500` |
+| `POST` | `/api/v1/submissions` | Recalcule puis sauvegarde une analyse | `x-save-key` en prod | `201` | `400`, `401`, `405`, `503`, `500` |
+| `GET` | `/api/v1/entries` | Liste l'historique paginé | `x-read-key` en prod | `200` | `400`, `401`, `405`, `503`, `500` |
+| `GET` | `/api/v1/export.csv` | Exporte l'historique filtré | `x-read-key` en prod | `200` | `400`, `401`, `405`, `503`, `500` |
+| `GET` | `/api/v1/stats` | Retourne les agrégats | `x-read-key` en prod | `200` | `400`, `401`, `405`, `503`, `500` |
+| `POST` | `/api/v1/auth/login` | Génère un JWT admin de démonstration | Config `AUTH_*` | `200` | `400`, `401`, `405`, `503`, `500` |
+| `GET` | `/api/v1/auth/me` | Vérifie le JWT admin | Bearer token | `200` | `401`, `405`, `503`, `500` |
+
+## `POST /api/v1/analyze`
+
+Calcule le verdict côté serveur sans écrire en base.
+
+```bash
+curl -X POST "$BASE_URL/api/v1/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{"pseudo":"Triankle","kd":1.7,"winrate":71,"ranked":210,"level":120,"rankKey":"emerald","playedSeasons":[17,18]}'
 ```
-
-Réponse :
 
 ```json
 {
   "data": {
-    "user": { "username": "admin", "role": "admin" },
-    "token": "jwt",
-    "tokenType": "Bearer",
-    "expiresIn": 900
+    "verdict": "suspect",
+    "verdictLabel": "Possible cheater — stats warrant scrutiny (not proof)",
+    "cheatScore": 62,
+    "smurfScore": 20,
+    "reasons": []
   }
 }
-```
-
-## `GET /api/v1/auth/me`
-
-Vérifie un JWT admin.
-
-```bash
-curl https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/auth/me \
-  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## `POST /api/v1/submissions`
 
-Enregistre une analyse dans PostgreSQL.
-
-| Élément | Valeur |
-| --- | --- |
-| Méthode | `POST` |
-| Auth | `x-save-key` si `SAVE_API_KEY` est configurée ; obligatoire en production |
-| Content-Type | `application/json` |
-| Succès | `201 Created` |
-
-### Body
-
-```json
-{
-  "pseudo": "Triankle",
-  "kd": 1.7,
-  "winrate": 71,
-  "ranked": 210,
-  "level": 120,
-  "rankKey": "emerald",
-  "playedSeasons": [17, 18],
-  "verdict": "uncertain",
-  "verdictLabel": "Mixed signals",
-  "cheatScore": 30,
-  "smurfScore": 0,
-  "reasons": [
-    { "text": "K/D is high for the rank." }
-  ]
-}
-```
-
-### Réponse succès
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "uuid",
-    "createdAt": "2026-05-31T20:00:00.000Z"
-  },
-  "id": "uuid",
-  "created_at": "2026-05-31T20:00:00.000Z"
-}
-```
-
-### Erreurs possibles
-
-| Code | Cause |
-| --- | --- |
-| `400` | Body JSON invalide ou champ hors limites. |
-| `401` | Clé `x-save-key` absente ou incorrecte. |
-| `405` | Méthode non autorisée. |
-| `503` | `DATABASE_URL` ou `SAVE_API_KEY` manquant en production. |
-| `500` | Erreur interne masquée en production. |
-
-### Exemple curl
+Sauvegarde une analyse. Le serveur ignore les scores/verdict client comme source de vérité et recalcule avec `lib/analyze.js`.
 
 ```bash
-curl -X POST https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/submissions \
+curl -X POST "$BASE_URL/api/v1/submissions" \
   -H "Content-Type: application/json" \
   -H "x-save-key: $SAVE_API_KEY" \
-  -d '{"pseudo":"Triankle","kd":1.7,"winrate":71,"ranked":210,"level":120,"rankKey":"emerald","playedSeasons":[17,18],"verdict":"uncertain","verdictLabel":"Mixed signals","cheatScore":30,"smurfScore":0,"reasons":[]}'
+  -d '{"pseudo":"Triankle","kd":1.7,"winrate":71,"ranked":210,"level":120,"rankKey":"emerald","playedSeasons":[17,18],"verdict":"uncertain","verdictLabel":"client value","cheatScore":0,"smurfScore":0,"reasons":[]}'
+```
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "createdAt": "2026-06-01T12:00:00.000Z",
+    "analysis": {
+      "verdict": "suspect",
+      "cheatScore": 62,
+      "smurfScore": 20
+    }
+  },
+  "meta": { "sourceOfTruth": "server" }
+}
 ```
 
 ## `GET /api/v1/entries`
 
-Retourne l'historique paginé des analyses.
+Query params stricts :
 
-| Élément | Valeur |
-| --- | --- |
-| Méthode | `GET` |
-| Auth | `x-read-key` si `READ_API_KEY` est configurée ; obligatoire en production |
-| Succès | `200 OK` |
-
-### Query params
-
-| Paramètre | Type | Défaut | Limites | Usage |
-| --- | --- | --- | --- | --- |
-| `limit` | integer | `50` | `1..200` | Nombre de lignes. |
-| `offset` | integer | `0` | `0..100000` | Décalage de pagination. |
-| `pseudo` | string | `null` | 80 caractères | Filtre insensible à la casse. |
-| `verdict` | string | `null` | 32 caractères | Filtre par verdict. |
-| `rank` | string | `null` | 32 caractères | Filtre par rang courant. |
-| `minScore` | number | `null` | `0..100` | Score minimum sur l'axe cheat ou smurf. |
-| `sort` | enum | `-createdAt` | champs autorisés | Tri par date, cheatScore ou smurfScore. |
-
-### Réponse succès
-
-```json
-{
-  "ok": true,
-  "data": [
-    {
-      "id": "uuid",
-      "createdAt": "2026-05-31T20:00:00.000Z",
-      "pseudo": "Triankle",
-      "kd": 1.7,
-      "winrate": 71,
-      "rankedMatches": 210,
-      "accountLevel": 120,
-      "rankKey": "emerald",
-      "seasonsPlayed": [17, 18],
-      "verdict": "uncertain",
-      "verdictLabel": "Mixed signals",
-      "cheatScore": 30,
-      "smurfScore": 0,
-      "reasonsJson": []
-    }
-  ],
-  "meta": {
-    "limit": 50,
-    "offset": 0,
-    "total": 1,
-    "pseudo": null
-  }
-}
-```
-
-### Exemple curl
+| Paramètre | Type | Défaut | Usage |
+| --- | --- | --- | --- |
+| `limit` | integer `1..200` | `50` | Taille de page |
+| `offset` | integer `0..100000` | `0` | Décalage |
+| `pseudo` | string | `null` | Filtre pseudo insensible à la casse |
+| `verdict` | `clean`, `smurf`, `suspect`, `uncertain` | `null` | Filtre verdict |
+| `rank` | string | `null` | Filtre rang |
+| `minScore` | number `0..100` | `null` | Score minimum cheat ou smurf |
+| `sort` | enum | `-createdAt` | `createdAt`, `cheatScore`, `smurfScore`, avec `-` pour desc |
 
 ```bash
-curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/entries?limit=20&offset=0&pseudo=tri" \
+curl "$BASE_URL/api/v1/entries?limit=20&verdict=suspect&sort=-cheatScore" \
   -H "x-read-key: $READ_API_KEY"
 ```
 
 ## `GET /api/v1/export.csv`
 
-Exporte l'historique filtré au format CSV avec les mêmes query params que `/api/v1/entries`.
+Utilise les mêmes filtres que `/entries`.
 
 ```bash
-curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/export.csv?verdict=suspect&minScore=70" \
+curl "$BASE_URL/api/v1/export.csv?minScore=70" \
   -H "x-read-key: $READ_API_KEY" \
   -o r6-suspect-entries.csv
 ```
 
 ## `GET /api/v1/stats`
 
-Retourne des agrégats sur les analyses sauvegardées.
-
-| Élément | Valeur |
-| --- | --- |
-| Méthode | `GET` |
-| Auth | Aucune clé dédiée actuellement |
-| Succès | `200 OK` |
-
-### Réponse succès
-
-```json
-{
-  "ok": true,
-  "data": {
-    "total": 4,
-    "averages": {
-      "kd": 1.72,
-      "winrate": 73.25,
-      "cheatScore": 58,
-      "smurfScore": 24
-    },
-    "lastSubmission": "2026-05-31T20:00:00.000Z",
-    "verdicts": [
-      { "verdict": "suspect", "count": 3 },
-      { "verdict": "uncertain", "count": 1 }
-    ]
-  }
-}
-```
-
-### Exemple curl
+Retourne les agrégats protégés par `READ_API_KEY` en production.
 
 ```bash
-curl https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/stats
+curl "$BASE_URL/api/v1/stats" -H "x-read-key: $READ_API_KEY"
 ```
-
-## Format d'erreur normalisé
 
 ```json
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request input",
-    "details": [
-      { "field": "kd", "code": "too_small", "message": "Too small: expected number to be >=0" }
+  "data": {
+    "total": 5,
+    "averages": {
+      "kd": 1.72,
+      "winrate": 61.4,
+      "cheatScore": 48,
+      "smurfScore": 36
+    },
+    "lastSubmission": "2026-06-01T12:00:00.000Z",
+    "verdicts": [
+      { "verdict": "suspect", "count": 2 }
     ]
   }
 }
+```
+
+## Auth admin
+
+Générer un hash :
+
+```bash
+npm run auth:hash -- "Demo1234!Demo"
+```
+
+Login :
+
+```bash
+curl -X POST "$BASE_URL/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Demo1234!Demo"}'
+```
+
+Vérification :
+
+```bash
+curl "$BASE_URL/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 ```

@@ -21,3 +21,9 @@ CREATE TABLE IF NOT EXISTS suspect_submissions (
 
 CREATE INDEX IF NOT EXISTS suspect_submissions_created_at_idx
   ON suspect_submissions (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS suspect_submissions_verdict_idx
+  ON suspect_submissions (verdict);
+
+CREATE INDEX IF NOT EXISTS suspect_submissions_rank_key_idx
+  ON suspect_submissions (rank_key);

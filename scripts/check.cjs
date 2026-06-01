@@ -8,13 +8,16 @@ const commands = [
   ['node', ['-c', 'lib/api-response.js']],
   ['node', ['-c', 'lib/auth.js']],
   ['node', ['-c', 'lib/validation.js']],
+  ['node', ['-c', 'lib/repositories/submission-repository.js']],
+  ['node', ['-c', 'lib/services/submission-service.js']],
   ['node', ['-c', 'public/script.js']],
   ['node', ['-c', 'public/scripts/api-client.js']],
   ['node', ['-c', 'public/scripts/report-utils.js']],
   ['npm', ['run', 'db:validate']],
   ['npm', ['test']],
   ['npm', ['run', 'lint']],
-  ['npm', ['run', 'build']],
+  ['npm', ['run', 'typecheck']],
+  ['npm', ['run', 'vercel-build']],
 ];
 
 for (const [cmd, args] of commands) {

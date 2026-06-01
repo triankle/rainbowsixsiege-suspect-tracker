@@ -55,7 +55,7 @@ public/scripts/
   dom.js              — utilitaires DOM (escapeHtml, showFormError, etc.)
   analysis.js         — logique heuristique pure (déjà extraite dans lib/analyze.js)
   ui.js               — gestion de l'affichage
-  api.js              — appels vers /api/submissions, /api/entries
+  api.js              — appels vers /api/v1/submissions, /api/v1/entries
   index.js            — point d'entrée qui orchestre les modules
 ```
 
@@ -64,6 +64,6 @@ Cependant, cette refactorisation n'est pas critique pour le MVP actuel : l'appli
 ## Améliorations possibles pour le futur
 
 - Migrer vers React/Next.js pour une componentisation réelle.
-- Ajouter un design system avec tokens CSS.
+- Étendre le design system existant avec des composants réutilisables.
 - Séparer les hooks de logique métier.
 - Ajouter des tests E2E (Playwright) pour le parcours utilisateur.

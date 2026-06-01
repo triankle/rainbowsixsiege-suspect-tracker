@@ -2,20 +2,27 @@
 
 ![CI](https://github.com/triankle/rainbowsixsiege-suspect-tracker/actions/workflows/ci.yml/badge.svg)
 
-R6 Suspect Check aide à repérer les profils Rainbow Six Siege qui méritent une vérification manuelle à partir de statistiques ranked copiées depuis R6 Tracker. L'application distingue les signaux **cheat-like**, **smurf-like** et **profil propre**, puis permet de sauvegarder les analyses dans PostgreSQL.
+R6 Suspect Check aide à analyser un profil Rainbow Six Siege ranked à partir de statistiques saisies manuellement, puis produit un verdict explicable entre profil propre, smurf probable et suspicion à vérifier.
 
 ## Démo en ligne
 
 Application déployée : https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app
 
+Routes utiles :
+
+- `/` ou `/index.html` : formulaire principal.
+- `/entries` ou `/entries.html` : historique PostgreSQL.
+- `/auth.html` : login JWT de démonstration si les variables `AUTH_*` sont configurées.
+
+Compte de démonstration recommandé en local : `admin` / `Demo1234!Demo` après génération du hash avec `npm run auth:hash -- "Demo1234!Demo"`.
 
 ## Captures d'écran
 
-Les captures peuvent être ajoutées dans `docs/screenshots/` avant la soutenance :
+Les captures sont à ajouter manuellement avant la soutenance dans `docs/screenshots/` :
 
-- `docs/screenshots/home.png` — formulaire principal d'analyse.
-- `docs/screenshots/result.png` — résultat d'une analyse.
-- `docs/screenshots/entries.png` — historique PostgreSQL.
+- `docs/screenshots/home.png` : formulaire principal.
+- `docs/screenshots/result.png` : résultat d'une analyse.
+- `docs/screenshots/entries.png` : historique filtré.
 
 ## Spécifications fonctionnelles
 
@@ -26,75 +33,75 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 ### Personae cibles
 
 - **Joueur ranked** : veut savoir si un adversaire paraît suspect avant de signaler trop vite.
-- **Modérateur de communauté** : veut centraliser des analyses rapides pendant une vérification manuelle.
-- **Évaluateur projet** : veut tester un parcours complet frontend, API, base de données et déploiement.
+- **Modérateur de communauté** : veut centraliser des analyses pendant une vérification manuelle.
+- **Évaluateur projet** : veut tester un parcours web complet avec frontend, API, base de données, sécurité et déploiement.
 
 ### MVP
 
-1. En tant que joueur ranked, je veux saisir les statistiques d'un profil afin d'obtenir un score de suspicion compréhensible.
-2. En tant que joueur ranked, je veux voir les raisons du verdict afin de comprendre les signaux retenus.
-3. En tant que joueur ranked, je veux copier un rapport partageable afin de transmettre le résultat sans capture manuelle.
+1. En tant que joueur ranked, je veux saisir les statistiques d'un profil afin d'obtenir un verdict compréhensible.
+2. En tant que joueur ranked, je veux voir les raisons détaillées afin de comprendre les signaux retenus.
+3. En tant que joueur ranked, je veux copier un rapport partageable afin de transmettre l'analyse sans capture manuelle.
 4. En tant que modérateur, je veux sauvegarder une analyse afin de conserver une trace dans PostgreSQL.
 5. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
-6. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base de données est connectée.
-7. En tant que modérateur, je veux filtrer et exporter l'historique afin de préparer une revue hors ligne.
-8. En tant qu'administrateur, je veux tester une authentification JWT afin de prouver la protection des routes privées.
+6. En tant que modérateur, je veux filtrer, trier et exporter l'historique afin de préparer une revue hors ligne.
+7. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base est connectée.
+8. En tant qu'administrateur, je veux tester un login JWT afin de vérifier le parcours d'authentification.
 
 ### Out of scope
 
 - L'application ne prouve pas une triche : elle produit uniquement une aide à la décision.
 - L'application ne scrape pas R6 Tracker et n'utilise pas d'API Ubisoft privée.
-- L'application ne gère pas de comptes publics multi-utilisateurs ; elle expose seulement une authentification admin JWT de démonstration.
+- L'application ne gère pas de comptes publics multi-utilisateurs ni de RBAC complet.
 - L'application ne remplace pas une investigation humaine ou une preuve vidéo.
 - L'application ne stocke pas de données personnelles sensibles.
 
 ### Parcours utilisateur principal
 
 1. Ouvrir `/` ou `/index.html` sur l'URL Vercel.
-2. Renseigner le pseudo optionnel, K/D, win rate, matchs ranked, niveau, rang et saisons jouées.
-3. Lire le verdict, les scores et les raisons détaillées affichés dans la page.
-4. Utiliser **Copy report** pour copier un rapport texte partageable.
-5. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
-6. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
-7. Ouvrir `/api/v1/stats` pour vérifier les statistiques agrégées de la base.
-8. Ouvrir `/auth.html` pour tester le login JWT de démonstration si les variables `AUTH_*` sont configurées.
+2. Renseigner pseudo optionnel, K/D, win rate, matchs ranked, niveau, rang et saisons jouées.
+3. Lire le verdict, les scores et les raisons affichés dans la page.
+4. Utiliser **Copy report** pour copier un rapport texte.
+5. Utiliser **Save to database** avec `SAVE_API_KEY` si la sauvegarde doit être testée.
+6. Ouvrir `/entries` pour consulter l'historique avec `READ_API_KEY`.
+7. Ouvrir `/api/v1/stats` avec `x-read-key` pour vérifier les agrégats.
+8. Ouvrir `/auth.html` pour tester `/api/v1/auth/login` et `/api/v1/auth/me`.
 
 ## Architecture
 
 ```mermaid
 graph LR
-  U[Utilisateur navigateur] -->|HTTPS| F[Frontend statique public/index.html sur Vercel]
-  F -->|JS local| H[Moteur heuristique lib/analyze.js]
-  F -->|POST JSON + x-save-key| S[/api/v1/submissions Serverless Node.js]
-  F -->|GET + x-read-key| E[/api/v1/entries Serverless Node.js]
-  U -->|GET| N[Next.js App Router /entries]
-  U -->|GET| A[/api/v1/stats Serverless Node.js]
-  S -->|Prisma ORM| P[(PostgreSQL Neon)]
-  E -->|Prisma ORM| P
-  A -->|Prisma aggregate/groupBy| P
-  N -->|Prisma ORM| P
+  browser["Navigateur desktop ou mobile"] -->|"HTTPS"| vercel["Vercel Next.js"]
+  vercel -->|"sert fichiers statiques"| publicUi["public/index.html et public/entries.html"]
+  vercel -->|"redirect statique"| nextRoutes["app/page.tsx et app/entries/page.tsx"]
+  publicUi -->|"fetch JSON ou CSV"| apiCatchAll["api/[...path].js"]
+  apiCatchAll -->|"validation Zod"| validation["lib/validation.js"]
+  apiCatchAll -->|"services métier"| services["lib/services/submission-service.js"]
+  services -->|"analyse serveur"| analyze["lib/analyze.js"]
+  services -->|"repository Prisma"| repository["lib/repositories/submission-repository.js"]
+  repository -->|"requêtes ORM"| postgres["PostgreSQL Neon"]
+  publicUi -->|"lien externe manuel"| r6Tracker["R6 Tracker"]
 ```
 
 ### Choix techniques
 
-**HTML/CSS/JavaScript vanilla** — Le formulaire principal reste très léger, rapide à charger et facile à démontrer sans hydration complexe. L'alternative aurait été une SPA React complète, plus structurée mais plus coûteuse à maintenir pour un MVP centré sur un seul écran. L'inconvénient assumé est une componentisation plus faible.
+**HTML/CSS/JavaScript vanilla** : le parcours principal reste très léger et fonctionne sans hydration React complexe. Une SPA React aurait donné une meilleure componentisation, mais aurait augmenté le coût de maintenance pour un MVP centré sur un seul formulaire. L'inconvénient accepté est une modularisation frontend encore limitée.
 
-**Next.js 15** — Next.js permet d'héberger proprement le projet sur Vercel, de servir les fichiers `public/` et d'ajouter des pages App Router comme `/entries`. Une app Express séparée aurait été plus contrôlable mais aurait demandé un hébergement backend dédié. L'inconvénient est une architecture hybride entre statique et App Router.
+**Next.js 15 sur Vercel** : Next sert les fichiers statiques, ajoute les headers globaux et permet le déploiement automatique. Une app Express séparée aurait donné plus de contrôle backend, mais aurait demandé un hébergement serveur distinct. L'inconvénient est une architecture hybride entre statique, App Router minimal et fonctions serverless.
 
-**Vercel Serverless Functions** — Les fichiers `api/*.js` deviennent des endpoints HTTPS sans serveur à administrer. Render ou Railway auraient aussi fonctionné, mais Vercel donne le déploiement automatique depuis GitHub. La limite est le modèle serverless : cold starts possibles et temps d'exécution encadré.
+**Fonction Vercel catch-all** : tous les endpoints sont regroupés dans `api/[...path].js` afin de rester sous la limite Hobby de fonctions serverless. Des fichiers API séparés seraient plus lisibles, mais créeraient trop de fonctions pour ce plan. L'inconvénient est un routeur manuel plus long.
 
-**Prisma** — Prisma évite les requêtes SQL concaténées, simplifie les accès typés et réduit le risque d'injection SQL. Une approche SQL manuelle aurait donné plus de contrôle sur les index et migrations. L'inconvénient est une dépendance ORM et un client à générer au build.
+**Prisma** : l'accès PostgreSQL passe par un ORM, sans concaténation SQL utilisateur. Des requêtes SQL manuelles auraient offert plus de contrôle, mais augmenteraient le risque d'injection et la duplication. L'inconvénient est le besoin de générer le client Prisma au build.
 
-**PostgreSQL Neon** — Neon fournit une base PostgreSQL managée gratuite adaptée au stockage durable des analyses. SQLite aurait été plus simple en local, mais moins adapté au déploiement serverless. L'inconvénient est la dépendance réseau et le besoin de gérer `DATABASE_URL`.
+**PostgreSQL Neon** : Neon fournit une base managée gratuite adaptée aux fonctions serverless. SQLite serait plus simple localement, mais ne convient pas au déploiement Vercel. L'inconvénient est la dépendance réseau et la gestion de `DATABASE_URL`.
 
-**Zod** — Zod centralise la validation serveur des body et query params. Une validation manuelle aurait réduit les dépendances, mais elle devient vite incohérente entre endpoints. L'inconvénient est un coût d'apprentissage et quelques transformations explicites.
+**Zod** : les bodies et query params sont validés avant toute logique métier. Une validation manuelle aurait réduit les dépendances, mais elle devient vite incohérente entre endpoints. L'inconvénient est un peu de boilerplate de schéma.
 
 ### Limites connues
 
-- Le frontend principal n'est pas encore découpé en composants React réutilisables.
+- Le frontend vanilla n'est pas encore découpé en composants réutilisables.
 - La CSP conserve `unsafe-inline` pour rester compatible avec le HTML statique actuel.
-- Le projet n'a pas d'authentification utilisateur complète, seulement des clés API de démonstration.
-- Il n'y a pas de domaine personnalisé ; le TLS est fourni par Vercel sur `vercel.app`.
+- L'auth JWT est une démonstration admin, pas une gestion complète d'utilisateurs.
+- Le domaine custom et les protections de branches GitHub doivent être configurés manuellement.
 - Les heuristiques sont explicables mais ne sont pas un modèle statistique entraîné.
 
 ## Stack
@@ -111,60 +118,50 @@ graph LR
 
 ## Lancer en local
 
-1. Cloner le dépôt.
+1. Prérequis : Node.js 18+, npm, une base PostgreSQL si la persistance doit fonctionner.
+2. Cloner le dépôt.
 
    ```bash
    git clone https://github.com/triankle/rainbowsixsiege-suspect-tracker.git
    cd rainbowsixsiege-suspect-tracker
    ```
 
-2. Installer les dépendances.
+3. Installer les dépendances.
 
    ```bash
    npm install
    ```
 
-3. Créer l'environnement local.
+4. Créer l'environnement local.
 
    ```bash
    cp .env.example .env.local
    ```
 
-4. Renseigner `DATABASE_URL` dans `.env.local` si la sauvegarde doit fonctionner.
+5. Renseigner `DATABASE_URL`, `SAVE_API_KEY`, `READ_API_KEY` et les variables `AUTH_*` dans `.env.local`.
 
-5. Préparer la base.
+6. Préparer la base.
 
    ```bash
    npm run db:push
-   npm run db:seed
+   npm run seed
    ```
 
-6. Lancer le serveur local.
+7. Lancer le serveur local.
 
    ```bash
    npm run dev
    ```
 
-7. Ouvrir l'application.
-
-   ```text
-   http://localhost:3000
-   http://localhost:3000/entries
-   ```
-
-Alternative Next.js seule :
-
-```bash
-npm run next:dev
-```
+8. Ouvrir `http://localhost:3000`, puis `http://localhost:3000/entries`.
 
 ## Variables d'environnement
 
 | Nom | Rôle | Exemple | Requise |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Connexion PostgreSQL Neon/Supabase/Vercel Postgres | `postgresql://user:password@host/db?sslmode=require` | Oui pour API DB |
-| `SAVE_API_KEY` | Protège `POST /api/submissions` via `x-save-key` | `r6-save-long-random-key` | Oui en production |
-| `READ_API_KEY` | Protège `GET /api/entries` via `x-read-key` | `r6-read-long-random-key` | Oui en production |
+| `SAVE_API_KEY` | Protège `POST /api/v1/submissions` via `x-save-key` | `r6-save-long-random-key` | Oui en production |
+| `READ_API_KEY` | Protège `GET /api/v1/entries`, `/api/v1/export.csv` et `/api/v1/stats` via `x-read-key` | `r6-read-long-random-key` | Oui en production |
 | `AUTH_USERNAME` | Identifiant admin de démonstration JWT | `admin` | Oui pour `/api/v1/auth/*` |
 | `AUTH_PASSWORD_HASH` | Hash scrypt du mot de passe admin | `scrypt$...` | Oui pour `/api/v1/auth/*` |
 | `AUTH_JWT_SECRET` | Secret HMAC JWT de 32 caractères minimum | `change-me-with-32-random-chars-min` | Oui pour `/api/v1/auth/*` |
@@ -172,12 +169,18 @@ npm run next:dev
 ## Tests
 
 ```bash
+npm run lint
+npm run typecheck
 npm test
+npm run vercel-build
 npm run check
-npm run auth:hash -- "Demo1234!Demo"
 ```
 
-`npm run check` vérifie la syntaxe des endpoints et librairies, valide Prisma, exécute les tests Jest et lance le build Next.js.
+`npm run check` vérifie la syntaxe, valide Prisma, exécute les tests Jest, le lint et le build.
+
+## Choix techniques
+
+Le projet privilégie un MVP déployable et défendable : formulaire statique pour la démonstration, API serverless unique pour Vercel Hobby, service métier côté serveur pour recalculer les verdicts, Prisma pour la persistance et Zod pour valider chaque entrée. La logique d'analyse vit dans `lib/analyze.js`, réutilisée par les tests et par `POST /api/v1/submissions`, ce qui évite de faire confiance aux scores envoyés par le client.
 
 ## Documentation complémentaire
 
@@ -186,48 +189,17 @@ npm run auth:hash -- "Demo1234!Demo"
 - [Documentation sécurité](docs/SECURITY.md)
 - [Documentation frontend](docs/FRONTEND.md)
 - [Workflow Git Flow](docs/GITFLOW.md)
+- [Roadmap XP](docs/XP_ROADMAP.md)
 - [Checklist release et soutenance](docs/RELEASE_CHECKLIST.md)
 - [Documentation soutenance détaillée](docs/DOCUMENTATION.md)
 
-## Choix techniques
-
-Le projet privilégie un MVP déployable et explicable : formulaire statique pour l'expérience principale, serverless Vercel pour les endpoints, Prisma pour l'accès aux données et Neon pour PostgreSQL managé. La logique métier d'analyse est séparée dans `lib/analyze.js` afin de pouvoir être testée indépendamment du DOM. Les réponses API ont été renforcées avec validation Zod et erreurs JSON normalisées pour faciliter le débogage et la soutenance.
-
-## Workflow Git recommandé
-
-Le workflow cible pour les prochains chantiers est :
-
-1. `main` reste la branche de production.
-2. `dev` sert de branche d'intégration.
-3. Chaque évolution part de `dev` via `feature/<nom>`.
-4. Toute fusion vers `dev` ou `main` passe par Pull Request.
-5. La CI doit être verte avant merge.
-
-Le template de PR est disponible dans `.github/pull_request_template.md`.
-
-## Déploiement
-
-- Frontend, Next.js et fonctions API : Vercel.
-- Base de données : Neon PostgreSQL.
-- Variables de production : Vercel Environment Variables.
-- Déploiement automatique : push sur `main` après CI verte.
-
-## Sécurité
-
-- Validation serveur via Zod.
-- Accès base via Prisma, sans concaténation SQL.
-- Secrets hors repo via Vercel Environment Variables.
-- Headers HTTP globaux dans `next.config.ts`.
-- Scan Gitleaks dans GitHub Actions.
-- Lecture/écriture protégées par clés API en production.
-
 ## Limites connues
 
-- Pas de login utilisateur ni RBAC complet.
-- Pas de domaine custom pour le moment.
-- Pas d'intégration directe avec R6 Tracker.
-- Pas de modèle IA entraîné : l'analyse repose sur des règles heuristiques.
-- Les captures d'écran doivent être ajoutées manuellement avant rendu final si demandées.
+- Pas de domaine custom configuré dans le repo.
+- Pas de compte utilisateur public ni de RBAC complet.
+- Pas d'intégration automatique avec R6 Tracker.
+- Pas de screenshots versionnés pour le moment.
+- Pas de migrations Prisma historiques : le setup local utilise `prisma db push`.
 
 ## License
 

@@ -14,6 +14,7 @@
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:pull": "dotenv -e .env.local -- prisma db pull",
     "db:seed": "dotenv -e .env.local -- node prisma/seed.cjs",
+    "seed": "npm run db:seed",
     "auth:hash": "node scripts/hash-password.cjs",
     "test": "jest",
     "typecheck": "tsc --noEmit",
