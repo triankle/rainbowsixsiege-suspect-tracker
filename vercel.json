@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
+  "framework": "nextjs",
   "rewrites": [
     { "source": "/api/v1/submissions", "destination": "/api/submissions" },
     { "source": "/api/v1/entries", "destination": "/api/entries" },

@@ -29,7 +29,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  // Pas d'export statique pour permettre les fonctions API
 };
 
 export default nextConfig;
