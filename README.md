@@ -55,7 +55,7 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 4. Utiliser **Copy report** pour copier un rapport texte partageable.
 5. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
 6. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
-7. Ouvrir `/api/stats` pour vérifier les statistiques agrégées de la base.
+7. Ouvrir `/api/v1/stats` pour vérifier les statistiques agrégées de la base.
 
 ## Architecture
 
@@ -63,10 +63,10 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 graph LR
   U[Utilisateur navigateur] -->|HTTPS| F[Frontend statique public/index.html sur Vercel]
   F -->|JS local| H[Moteur heuristique lib/analyze.js]
-  F -->|POST JSON + x-save-key| S[/api/submissions Serverless Node.js]
-  F -->|GET + x-read-key| E[/api/entries Serverless Node.js]
+  F -->|POST JSON + x-save-key| S[/api/v1/submissions Serverless Node.js]
+  F -->|GET + x-read-key| E[/api/v1/entries Serverless Node.js]
   U -->|GET| N[Next.js App Router /entries]
-  U -->|GET| A[/api/stats Serverless Node.js]
+  U -->|GET| A[/api/v1/stats Serverless Node.js]
   S -->|Prisma ORM| P[(PostgreSQL Neon)]
   E -->|Prisma ORM| P
   A -->|Prisma aggregate/groupBy| P
@@ -178,6 +178,7 @@ npm run check
 - [Documentation API](docs/API.md)
 - [Documentation base de données](docs/DB.md)
 - [Documentation sécurité](docs/SECURITY.md)
+- [Documentation frontend](docs/FRONTEND.md)
 - [Workflow Git Flow](docs/GITFLOW.md)
 - [Documentation soutenance détaillée](docs/DOCUMENTATION.md)
 

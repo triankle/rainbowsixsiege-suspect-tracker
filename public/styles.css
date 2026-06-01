@@ -1,18 +1,18 @@
 /* Editorial noir — Paradise Hotel 51–inspired mood (long-form zine, crimson accent) */
 :root {
-  --ink: #070708;
-  --panel: #0e0e12;
-  --panel-raised: #15151c;
-  --line: #2a2a34;
-  --text: #e9e6df;
-  --text-dim: #9a958a;
-  --accent: #e22c2c;
-  --accent-glow: rgba(226, 44, 44, 0.35);
-  --accent-muted: #b32424;
-  --danger: #ff5c5c;
-  --warning: #e8a838;
-  --success: #6ecf8f;
-  --radius: 2px;
+  --ink: var(--color-bg);
+  --panel: var(--color-surface);
+  --panel-raised: var(--color-surface-raised);
+  --line: var(--color-border);
+  --text: var(--color-text);
+  --text-dim: var(--color-text-muted);
+  --accent: var(--color-primary);
+  --accent-glow: var(--color-primary-glow);
+  --accent-muted: var(--color-primary-muted);
+  --danger: var(--color-error);
+  --warning: var(--color-warning);
+  --success: var(--color-success);
+  --radius: var(--radius-sm);
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --font-display: "Syne", system-ui, sans-serif;
 }
@@ -34,6 +34,27 @@ body {
   line-height: 1.65;
   min-height: 100vh;
   position: relative;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+button,
+a,
+input,
+select {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+
+button:active,
+a:active {
+  transform: translateY(1px);
 }
 
 /* Layered atmosphere */

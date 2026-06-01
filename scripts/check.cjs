@@ -4,6 +4,9 @@ const commands = [
   ['node', ['-c', 'api/submissions.js']],
   ['node', ['-c', 'api/entries.js']],
   ['node', ['-c', 'api/stats.js']],
+  ['node', ['-c', 'api/v1/submissions.js']],
+  ['node', ['-c', 'api/v1/entries.js']],
+  ['node', ['-c', 'api/v1/stats.js']],
   ['node', ['-c', 'scripts/local-dev.cjs']],
   ['node', ['-c', 'prisma/seed.cjs']],
   ['node', ['-c', 'lib/analyze.js']],
@@ -12,6 +15,7 @@ const commands = [
   ['node', ['-c', 'public/script.js']],
   ['npm', ['run', 'db:validate']],
   ['npm', ['test']],
+  ['npm', ['run', 'lint']],
   ['npm', ['run', 'build']],
 ];
 

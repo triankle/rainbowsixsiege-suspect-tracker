@@ -2,6 +2,8 @@
 
 Base URL production : `https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app`
 
+Version stable recommandée : `/api/v1`. Les anciennes routes `/api/*` restent disponibles comme alias de compatibilité.
+
 Toutes les réponses JSON récentes utilisent le format principal `{ data, meta? }` ou `{ error }`. Certains champs historiques (`ok`, `rows`, `id`) sont conservés pour compatibilité avec le frontend existant.
 
 ## Authentification
@@ -13,7 +15,7 @@ L'application n'a pas de comptes utilisateurs. Les routes sensibles sont protég
 | `SAVE_API_KEY` | `x-save-key` | Autorise l'écriture d'une analyse. |
 | `READ_API_KEY` | `x-read-key` | Autorise la lecture de l'historique. |
 
-## `POST /api/submissions`
+## `POST /api/v1/submissions`
 
 Enregistre une analyse dans PostgreSQL.
 
@@ -72,13 +74,13 @@ Enregistre une analyse dans PostgreSQL.
 ### Exemple curl
 
 ```bash
-curl -X POST https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/submissions \
+curl -X POST https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/submissions \
   -H "Content-Type: application/json" \
   -H "x-save-key: $SAVE_API_KEY" \
   -d '{"pseudo":"Triankle","kd":1.7,"winrate":71,"ranked":210,"level":120,"rankKey":"emerald","playedSeasons":[17,18],"verdict":"uncertain","verdictLabel":"Mixed signals","cheatScore":30,"smurfScore":0,"reasons":[]}'
 ```
 
-## `GET /api/entries`
+## `GET /api/v1/entries`
 
 Retourne l'historique paginé des analyses.
 
@@ -131,11 +133,11 @@ Retourne l'historique paginé des analyses.
 ### Exemple curl
 
 ```bash
-curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/entries?limit=20&offset=0&pseudo=tri" \
+curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/entries?limit=20&offset=0&pseudo=tri" \
   -H "x-read-key: $READ_API_KEY"
 ```
 
-## `GET /api/stats`
+## `GET /api/v1/stats`
 
 Retourne des agrégats sur les analyses sauvegardées.
 
@@ -170,7 +172,7 @@ Retourne des agrégats sur les analyses sauvegardées.
 ### Exemple curl
 
 ```bash
-curl https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/stats
+curl https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/stats
 ```
 
 ## Format d'erreur normalisé

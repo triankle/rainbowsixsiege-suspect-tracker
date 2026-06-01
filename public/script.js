@@ -374,6 +374,7 @@ function analyzeProfile(input) {
     verdictLabel = `Elevated suspicion (${finalScore}/100) — mixed smurf/cheat signals`;
     verdictClass = 'uncertain';
   } else {
+    verdict = 'uncertain';
     verdictLabel = 'Mixed / low confidence — manual review';
     verdictClass = 'uncertain';
   }
