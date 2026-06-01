@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin auth — R6 Suspect Check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <p class="masthead__kicker">Admin demo auth</p>
+    <h1 class="masthead__title">R6 Suspect Check</h1>
+    <p class="tagline">JWT login endpoint demonstration for the evaluation rubric.</p>
+    <nav class="masthead__nav">
+      <a href="/">Back to checker</a>
+      <a href="/entries">Stored entries</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="form-section">
+      <h2>Admin login</h2>
+      <p class="hint">Credentials are configured with AUTH_USERNAME, AUTH_PASSWORD_HASH and AUTH_JWT_SECRET. The password is never stored in plain text.</p>
+      <p id="auth-feedback" class="form-error hidden" role="status"></p>
+      <form id="auth-form">
+        <div class="field">
+          <label for="auth-username">Username</label>
+          <input id="auth-username" name="username" type="text" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="auth-password">Password</label>
+          <input id="auth-password" name="password" type="password" minlength="12" autocomplete="current-password" required>
+        </div>
+        <button type="submit">Login</button>
+      </form>
+      <pre id="auth-result" class="hidden"></pre>
+    </section>
+  </main>
+
+  <script src="scripts/api-client.js"></script>
+  <script>
+    const form = document.getElementById('auth-form');
+    const feedback = document.getElementById('auth-feedback');
+    const result = document.getElementById('auth-result');
+
+    function setFeedback(message, ok) {
+      feedback.textContent = message;
+      feedback.classList.remove('hidden');
+      feedback.classList.toggle('save-db-feedback--ok', Boolean(ok));
+      feedback.classList.toggle('save-db-feedback--err', !ok);
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      result.classList.add('hidden');
+      setFeedback('Logging in…', true);
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value;
+      try {
+        const loginResponse = await window.R6Api.login(username, password);
+        const profileResponse = await window.R6Api.me(loginResponse.data.token);
+        result.textContent = JSON.stringify({ login: loginResponse.data, me: profileResponse.data }, null, 2);
+        result.classList.remove('hidden');
+        setFeedback('Authenticated. JWT verified with /api/v1/auth/me.', true);
+      } catch (err) {
+        setFeedback(err.message || 'Authentication failed.', false);
+      }
+    });
+  </script>
+</body>
+</html>

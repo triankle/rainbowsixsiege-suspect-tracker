@@ -2,13 +2,15 @@
 
 ## Modèle de sécurité
 
-R6 Suspect Check n'a pas de comptes utilisateurs. Le modèle choisi est stateless : le navigateur appelle des fonctions serverless Vercel, et les actions sensibles sont protégées par des clés configurées côté serveur.
+R6 Suspect Check n'a pas de comptes publics multi-utilisateurs. Le modèle choisi est stateless : le navigateur appelle des fonctions serverless Vercel, les actions sensibles sont protégées par des clés configurées côté serveur, et une authentification admin JWT de démonstration permet de valider le parcours login sécurisé.
 
 | Action | Protection |
 | --- | --- |
 | Enregistrer une analyse | Header `x-save-key` comparé à `SAVE_API_KEY`. |
 | Lire l'historique | Header `x-read-key` comparé à `READ_API_KEY`. |
 | Lire les statistiques | Public, uniquement agrégé. |
+| Login admin | Mot de passe vérifié avec hash `scrypt` et JWT HMAC court. |
+| Lire `/api/v1/auth/me` | Header `Authorization: Bearer <token>`. |
 | Accéder à PostgreSQL | Impossible depuis le client ; `DATABASE_URL` reste côté serveur. |
 
 ## Secrets
@@ -25,8 +27,21 @@ Les secrets de production sont injectés dans Vercel Environment Variables :
 - `DATABASE_URL`
 - `SAVE_API_KEY`
 - `READ_API_KEY`
+- `AUTH_USERNAME`
+- `AUTH_PASSWORD_HASH`
+- `AUTH_JWT_SECRET`
 
 Le fichier `.env.example` contient uniquement des valeurs factices ou commentées.
+
+## Authentification admin JWT
+
+Le projet fournit une authentification admin légère pour démontrer le critère sécurité sans introduire de comptes publics multi-utilisateurs :
+
+1. Le mot de passe admin n'est jamais stocké en clair.
+2. `npm run auth:hash -- "mot-de-passe-long"` génère un hash `scrypt`.
+3. `/api/v1/auth/login` vérifie le hash avec comparaison en temps constant.
+4. `/api/v1/auth/me` vérifie un JWT HMAC SHA-256 avec expiration courte de 15 minutes.
+5. Les secrets sont lus depuis l'environnement et doivent être injectés par l'hébergeur.
 
 ## Validation des entrées
 
@@ -35,6 +50,7 @@ Les endpoints utilisent `zod` via `lib/validation.js` :
 - `submissionSchema` pour `POST /api/submissions`.
 - `entriesQuerySchema` pour `GET /api/entries`.
 - `emptyQuerySchema` pour `GET /api/stats`.
+- `loginSchema` pour `POST /api/v1/auth/login`.
 
 Les erreurs de validation retournent un JSON normalisé avec `field`, `code` et `message`.
 

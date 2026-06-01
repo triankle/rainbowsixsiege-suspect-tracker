@@ -14,6 +14,40 @@ L'application n'a pas de comptes utilisateurs. Les routes sensibles sont protég
 | --- | --- | --- |
 | `SAVE_API_KEY` | `x-save-key` | Autorise l'écriture d'une analyse. |
 | `READ_API_KEY` | `x-read-key` | Autorise la lecture de l'historique. |
+| `AUTH_USERNAME` + `AUTH_PASSWORD_HASH` + `AUTH_JWT_SECRET` | `Authorization: Bearer <token>` | Authentification admin JWT de démonstration. |
+
+## `POST /api/v1/auth/login`
+
+Authentifie l'administrateur configuré par variables d'environnement.
+
+```json
+{
+  "username": "admin",
+  "password": "Demo1234!Demo"
+}
+```
+
+Réponse :
+
+```json
+{
+  "data": {
+    "user": { "username": "admin", "role": "admin" },
+    "token": "jwt",
+    "tokenType": "Bearer",
+    "expiresIn": 900
+  }
+}
+```
+
+## `GET /api/v1/auth/me`
+
+Vérifie un JWT admin.
+
+```bash
+curl https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ## `POST /api/v1/submissions`
 
@@ -97,6 +131,10 @@ Retourne l'historique paginé des analyses.
 | `limit` | integer | `50` | `1..200` | Nombre de lignes. |
 | `offset` | integer | `0` | `0..100000` | Décalage de pagination. |
 | `pseudo` | string | `null` | 80 caractères | Filtre insensible à la casse. |
+| `verdict` | string | `null` | 32 caractères | Filtre par verdict. |
+| `rank` | string | `null` | 32 caractères | Filtre par rang courant. |
+| `minScore` | number | `null` | `0..100` | Score minimum sur l'axe cheat ou smurf. |
+| `sort` | enum | `-createdAt` | champs autorisés | Tri par date, cheatScore ou smurfScore. |
 
 ### Réponse succès
 
@@ -135,6 +173,16 @@ Retourne l'historique paginé des analyses.
 ```bash
 curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/entries?limit=20&offset=0&pseudo=tri" \
   -H "x-read-key: $READ_API_KEY"
+```
+
+## `GET /api/v1/export.csv`
+
+Exporte l'historique filtré au format CSV avec les mêmes query params que `/api/v1/entries`.
+
+```bash
+curl "https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app/api/v1/export.csv?verdict=suspect&minScore=70" \
+  -H "x-read-key: $READ_API_KEY" \
+  -o r6-suspect-entries.csv
 ```
 
 ## `GET /api/v1/stats`

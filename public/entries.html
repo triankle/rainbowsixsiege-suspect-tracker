@@ -33,7 +33,23 @@
       <p class="hint">Analyses saved to PostgreSQL (table <code>suspect_submissions</code>).</p>
       <div class="db-controls">
         <input type="password" id="read-key-input" class="save-key-input" placeholder="Read key (only if server uses READ_API_KEY)" autocomplete="off" />
+        <input type="search" id="pseudo-filter-input" class="save-key-input" placeholder="Filter pseudo" autocomplete="off" />
+        <select id="verdict-filter-input" class="save-key-input" aria-label="Filter verdict">
+          <option value="">All verdicts</option>
+          <option value="clean">Clean</option>
+          <option value="smurf">Smurf</option>
+          <option value="suspect">Suspect</option>
+          <option value="uncertain">Uncertain</option>
+        </select>
+        <input type="number" id="min-score-input" class="save-key-input" min="0" max="100" placeholder="Min score" />
+        <select id="sort-input" class="save-key-input" aria-label="Sort entries">
+          <option value="-createdAt">Newest first</option>
+          <option value="createdAt">Oldest first</option>
+          <option value="-cheatScore">Cheat score desc</option>
+          <option value="-smurfScore">Smurf score desc</option>
+        </select>
         <button type="button" id="db-refresh-btn" class="btn-db-refresh">Refresh</button>
+        <a id="csv-export-link" class="btn-db-refresh" href="/api/v1/export.csv">Export CSV</a>
       </div>
       <p id="db-feedback" class="db-feedback hidden" role="status"></p>
       <div id="db-content" class="db-content"></div>
@@ -50,6 +66,11 @@
     const dbFeedback = document.getElementById('db-feedback');
     const dbRefreshBtn = document.getElementById('db-refresh-btn');
     const readKeyInput = document.getElementById('read-key-input');
+    const pseudoFilterInput = document.getElementById('pseudo-filter-input');
+    const verdictFilterInput = document.getElementById('verdict-filter-input');
+    const minScoreInput = document.getElementById('min-score-input');
+    const sortInput = document.getElementById('sort-input');
+    const csvExportLink = document.getElementById('csv-export-link');
 
     function setDbFeedback(message, kind) {
       if (!dbFeedback) return;
@@ -147,14 +168,34 @@
       dbContent.classList.remove('hidden');
     }
 
+    function getEntryFilters() {
+      return {
+        readKey: readKeyInput && readKeyInput.value ? readKeyInput.value.trim() : '',
+        pseudo: pseudoFilterInput && pseudoFilterInput.value ? pseudoFilterInput.value.trim() : '',
+        verdict: verdictFilterInput && verdictFilterInput.value ? verdictFilterInput.value : '',
+        minScore: minScoreInput && minScoreInput.value ? minScoreInput.value : '',
+        sort: sortInput && sortInput.value ? sortInput.value : '-createdAt',
+        limit: 20,
+      };
+    }
+
+    function updateCsvExportLink() {
+      if (!csvExportLink) return;
+      csvExportLink.href = window.R6Api.buildExportCsvUrl(getEntryFilters());
+      const readKey = readKeyInput && readKeyInput.value ? readKeyInput.value.trim() : '';
+      csvExportLink.title = readKey
+        ? 'CSV export uses current filters; include x-read-key with curl if production requires it.'
+        : 'CSV export uses current filters. Add READ_API_KEY with curl if production requires it.';
+    }
+
     async function loadDbRows() {
       setDbFeedback('Chargement en cours…', '');
       if (dbRefreshBtn) dbRefreshBtn.disabled = true;
 
       try {
-        const readKey = readKeyInput && readKeyInput.value ? readKeyInput.value.trim() : '';
-        const data = await window.R6Api.listEntries({ readKey, limit: 20 });
+        const data = await window.R6Api.listEntries(getEntryFilters());
         const rows = Array.isArray(data.rows) ? data.rows : [];
+        updateCsvExportLink();
         renderDbRows(rows);
         setDbFeedback(
           rows.length
@@ -174,7 +215,11 @@
     }
 
     if (dbRefreshBtn) dbRefreshBtn.addEventListener('click', () => void loadDbRows());
+    [pseudoFilterInput, verdictFilterInput, minScoreInput, sortInput].forEach((input) => {
+      if (input) input.addEventListener('change', () => void loadDbRows());
+    });
 
+    updateCsvExportLink();
     loadDbRows();
   </script>
 </body>

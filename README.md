@@ -37,12 +37,14 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 4. En tant que modérateur, je veux sauvegarder une analyse afin de conserver une trace dans PostgreSQL.
 5. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
 6. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base de données est connectée.
+7. En tant que modérateur, je veux filtrer et exporter l'historique afin de préparer une revue hors ligne.
+8. En tant qu'administrateur, je veux tester une authentification JWT afin de prouver la protection des routes privées.
 
 ### Out of scope
 
 - L'application ne prouve pas une triche : elle produit uniquement une aide à la décision.
 - L'application ne scrape pas R6 Tracker et n'utilise pas d'API Ubisoft privée.
-- L'application ne gère pas de comptes utilisateurs, rôles ou sessions.
+- L'application ne gère pas de comptes publics multi-utilisateurs ; elle expose seulement une authentification admin JWT de démonstration.
 - L'application ne remplace pas une investigation humaine ou une preuve vidéo.
 - L'application ne stocke pas de données personnelles sensibles.
 
@@ -55,6 +57,7 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 5. Utiliser **Save to database** avec la clé de sauvegarde si la persistance doit être testée.
 6. Ouvrir `/entries` pour consulter l'historique sauvegardé avec la clé de lecture.
 7. Ouvrir `/api/v1/stats` pour vérifier les statistiques agrégées de la base.
+8. Ouvrir `/auth.html` pour tester le login JWT de démonstration si les variables `AUTH_*` sont configurées.
 
 ## Architecture
 
@@ -162,12 +165,16 @@ npm run next:dev
 | `DATABASE_URL` | Connexion PostgreSQL Neon/Supabase/Vercel Postgres | `postgresql://user:password@host/db?sslmode=require` | Oui pour API DB |
 | `SAVE_API_KEY` | Protège `POST /api/submissions` via `x-save-key` | `r6-save-long-random-key` | Oui en production |
 | `READ_API_KEY` | Protège `GET /api/entries` via `x-read-key` | `r6-read-long-random-key` | Oui en production |
+| `AUTH_USERNAME` | Identifiant admin de démonstration JWT | `admin` | Oui pour `/api/v1/auth/*` |
+| `AUTH_PASSWORD_HASH` | Hash scrypt du mot de passe admin | `scrypt$...` | Oui pour `/api/v1/auth/*` |
+| `AUTH_JWT_SECRET` | Secret HMAC JWT de 32 caractères minimum | `change-me-with-32-random-chars-min` | Oui pour `/api/v1/auth/*` |
 
 ## Tests
 
 ```bash
 npm test
 npm run check
+npm run auth:hash -- "Demo1234!Demo"
 ```
 
 `npm run check` vérifie la syntaxe des endpoints et librairies, valide Prisma, exécute les tests Jest et lance le build Next.js.

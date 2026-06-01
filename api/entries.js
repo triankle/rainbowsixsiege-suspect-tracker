@@ -38,15 +38,28 @@ module.exports = async function handler(req, res) {
       entriesQuerySchema,
       req.query && typeof req.query === 'object' ? req.query : {}
     );
-    const where = query.pseudo
-      ? { pseudo: { contains: query.pseudo, mode: 'insensitive' } }
-      : undefined;
+    const where = {
+      ...(query.pseudo ? { pseudo: { contains: query.pseudo, mode: 'insensitive' } } : {}),
+      ...(query.verdict ? { verdict: query.verdict } : {}),
+      ...(query.rank ? { rankKey: query.rank } : {}),
+      ...(query.minScore != null
+        ? {
+            OR: [
+              { cheatScore: { gte: query.minScore } },
+              { smurfScore: { gte: query.minScore } },
+            ],
+          }
+        : {}),
+    };
+    const [sortField, sortDirection] = query.sort.startsWith('-')
+      ? [query.sort.slice(1), 'desc']
+      : [query.sort, 'asc'];
 
     const prisma = getPrisma();
     const [rows, total] = await Promise.all([
       prisma.suspectSubmission.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [sortField]: sortDirection },
         skip: query.offset,
         take: query.limit,
       }),
@@ -78,6 +91,10 @@ module.exports = async function handler(req, res) {
         offset: query.offset,
         total,
         pseudo: query.pseudo,
+        verdict: query.verdict,
+        rank: query.rank,
+        minScore: query.minScore,
+        sort: query.sort,
       },
       rows: safe,
       limit: query.limit,

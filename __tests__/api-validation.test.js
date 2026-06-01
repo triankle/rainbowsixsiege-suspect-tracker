@@ -1,5 +1,6 @@
 const {
   entriesQuerySchema,
+  loginSchema,
   parseJsonBody,
   parseOrThrow,
   submissionSchema,
@@ -58,6 +59,28 @@ describe('api validation', () => {
 
   test('rejects entries query limit above max', () => {
     expect(() => parseOrThrow(entriesQuerySchema, { limit: '999' })).toThrow(ValidationError);
+  });
+
+  test('accepts advanced entries query params', () => {
+    const parsed = parseOrThrow(entriesQuerySchema, {
+      pseudo: 'tri',
+      verdict: 'suspect',
+      minScore: '70',
+      sort: '-cheatScore',
+    });
+
+    expect(parsed.verdict).toBe('suspect');
+    expect(parsed.minScore).toBe(70);
+    expect(parsed.sort).toBe('-cheatScore');
+  });
+
+  test('rejects weak login password length', () => {
+    expect(() =>
+      parseOrThrow(loginSchema, {
+        username: 'admin',
+        password: 'short',
+      })
+    ).toThrow(ValidationError);
   });
 
   test('parses JSON body strings', () => {
