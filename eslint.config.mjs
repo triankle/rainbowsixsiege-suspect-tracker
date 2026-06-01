@@ -3,7 +3,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'public/music_bg.mp3'],
+    ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'public/music_bg.mp3', 'out/**'],
   },
   js.configs.recommended,
   {

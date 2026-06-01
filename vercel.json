@@ -1,7 +1,6 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "framework": "nextjs",
   "rewrites": [
     { "source": "/api/v1/submissions", "destination": "/api/submissions" },
     { "source": "/api/v1/entries", "destination": "/api/entries" },
@@ -9,5 +8,10 @@
     { "source": "/api/v1/export.csv", "destination": "/api/export.csv" },
     { "source": "/api/v1/auth/login", "destination": "/api/auth/login" },
     { "source": "/api/v1/auth/me", "destination": "/api/auth/me" }
-  ]
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 10
+    }
+  }
 }
