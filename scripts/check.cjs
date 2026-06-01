@@ -1,12 +1,7 @@
 const { spawnSync } = require('child_process');
 
 const commands = [
-  ['node', ['-c', 'api/submissions.js']],
-  ['node', ['-c', 'api/entries.js']],
-  ['node', ['-c', 'api/stats.js']],
-  ['node', ['-c', 'api/export.csv.js']],
-  ['node', ['-c', 'api/auth/login.js']],
-  ['node', ['-c', 'api/auth/me.js']],
+  ['node', ['-c', 'api/[...path].js']],
   ['node', ['-c', 'scripts/local-dev.cjs']],
   ['node', ['-c', 'prisma/seed.cjs']],
   ['node', ['-c', 'lib/analyze.js']],

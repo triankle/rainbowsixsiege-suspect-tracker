@@ -8,9 +8,7 @@ const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
-const submissionsHandler = require(path.join(__dirname, '..', 'api', 'submissions.js'));
-const entriesHandler = require(path.join(__dirname, '..', 'api', 'entries.js'));
-const statsHandler = require(path.join(__dirname, '..', 'api', 'stats.js'));
+const apiHandler = require(path.join(__dirname, '..', 'api', '[...path].js'));
 const staticRoot = path.join(__dirname, '..', 'public');
 
 const MIME = {
@@ -57,7 +55,7 @@ const server = http.createServer(async (req, res) => {
     return res.end('Bad request');
   }
 
-  if (url.pathname === '/api/submissions') {
+  if (url.pathname.startsWith('/api/')) {
     let body;
     try {
       const buf = await readBody(req);
@@ -69,55 +67,11 @@ const server = http.createServer(async (req, res) => {
       method: req.method,
       headers: req.headers,
       body,
-    };
-    try {
-      await submissionsHandler(mockReq, res);
-    } catch (e) {
-      console.error(e);
-      if (!res.writableEnded) {
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ error: 'Server error' }));
-      }
-    }
-    return;
-  }
-
-  if (url.pathname === '/api/entries') {
-    let body;
-    try {
-      const buf = await readBody(req);
-      body = buf.length ? JSON.parse(buf.toString('utf8')) : {};
-    } catch {
-      body = null;
-    }
-    const mockReq = {
-      method: req.method,
-      headers: req.headers,
-      body,
+      url: `${url.pathname}${url.search}`,
       query: Object.fromEntries(url.searchParams.entries()),
     };
     try {
-      await entriesHandler(mockReq, res);
-    } catch (e) {
-      console.error(e);
-      if (!res.writableEnded) {
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ error: 'Server error' }));
-      }
-    }
-    return;
-  }
-
-  if (url.pathname === '/api/stats') {
-    const mockReq = {
-      method: req.method,
-      headers: req.headers,
-      body: {},
-    };
-    try {
-      await statsHandler(mockReq, res);
+      await apiHandler(mockReq, res);
     } catch (e) {
       console.error(e);
       if (!res.writableEnded) {
