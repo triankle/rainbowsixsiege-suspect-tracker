@@ -16,6 +16,7 @@
     "db:seed": "dotenv -e .env.local -- node prisma/seed.cjs",
     "auth:hash": "node scripts/hash-password.cjs",
     "test": "jest",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "vercel-build": "prisma generate && next build",
