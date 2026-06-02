@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { hashPassword } = require('../lib/auth.js');
 const { toCreateData } = require('../lib/services/submission-service.js');
 
 const prisma = new PrismaClient();
@@ -51,7 +52,48 @@ const demoInputs = [
   },
 ];
 
+const demoUsers = [
+  {
+    username: 'admin',
+    email: 'admin@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'ADMIN',
+  },
+  {
+    username: 'moderator',
+    email: 'moderator@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'MODERATOR',
+  },
+  {
+    username: 'viewer',
+    email: 'viewer@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'VIEWER',
+  },
+];
+
 async function main() {
+  for (const user of demoUsers) {
+    await prisma.authUser.upsert({
+      where: { username: user.username },
+      update: {
+        email: user.email,
+        role: user.role,
+        isActive: true,
+        passwordHash: hashPassword(user.password),
+        tokenVersion: { increment: 1 },
+      },
+      create: {
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: true,
+        passwordHash: hashPassword(user.password),
+      },
+    });
+  }
+
   const pseudos = demoInputs.map((row) => row.pseudo);
   await prisma.suspectSubmission.deleteMany({
     where: { pseudo: { in: pseudos } },
@@ -59,7 +101,7 @@ async function main() {
   await prisma.suspectSubmission.createMany({
     data: demoInputs.map((input) => toCreateData(input)),
   });
-  console.log(`Seeded ${demoInputs.length} demo suspect submissions.`);
+  console.log(`Seeded ${demoUsers.length} demo users and ${demoInputs.length} demo suspect submissions.`);
 }
 
 main()

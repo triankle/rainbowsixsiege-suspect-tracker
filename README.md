@@ -12,9 +12,9 @@ Routes utiles :
 
 - `/` ou `/index.html` : formulaire principal.
 - `/entries` ou `/entries.html` : historique PostgreSQL.
-- `/auth.html` : login JWT de démonstration si les variables `AUTH_*` sont configurées.
+- `/auth.html` : login JWT/RBAC avec les utilisateurs seedés en base.
 
-Compte de démonstration recommandé en local : `admin` / `Demo1234!Demo` après génération du hash avec `npm run auth:hash -- "Demo1234!Demo"`.
+Comptes de démonstration créés par `npm run seed` : `admin`, `moderator`, `viewer` avec le mot de passe `Demo1234!Demo`.
 
 ## Captures d'écran
 
@@ -45,7 +45,7 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 5. En tant que modérateur, je veux consulter l'historique afin de comparer les profils déjà vérifiés.
 6. En tant que modérateur, je veux filtrer, trier et exporter l'historique afin de préparer une revue hors ligne.
 7. En tant qu'évaluateur, je veux lire des statistiques agrégées afin de confirmer que la base est connectée.
-8. En tant qu'administrateur, je veux tester un login JWT afin de vérifier le parcours d'authentification.
+8. En tant qu'administrateur, je veux tester un login JWT avec rôles afin de vérifier les permissions RBAC.
 
 ### Out of scope
 
@@ -64,7 +64,7 @@ Les joueurs et modérateurs R6 perdent du temps à interpréter des profils rank
 5. Utiliser **Save to database** avec `SAVE_API_KEY` si la sauvegarde doit être testée.
 6. Ouvrir `/entries` pour consulter l'historique avec `READ_API_KEY`.
 7. Ouvrir `/api/v1/stats` avec `x-read-key` pour vérifier les agrégats.
-8. Ouvrir `/auth.html` pour tester `/api/v1/auth/login` et `/api/v1/auth/me`.
+8. Ouvrir `/auth.html` pour tester `/api/v1/auth/login`, `/api/v1/auth/me` et `/api/v1/auth/logout`.
 
 ## Architecture
 
@@ -104,7 +104,7 @@ L'application est publiée sur un domaine Vercel managé : `suspecttracker-5ykww
 
 - Le frontend vanilla n'est pas encore découpé en composants réutilisables, mais il ne duplique plus le moteur d'analyse.
 - La CSP conserve `unsafe-inline` pour rester compatible avec le HTML statique actuel.
-- L'auth JWT est une démonstration admin, pas une gestion complète d'utilisateurs.
+- L'auth utilise des utilisateurs PostgreSQL avec rôles `admin`, `moderator` et `viewer`.
 - Le domaine est un domaine Vercel managé plutôt qu'un domaine personnalisé acheté séparément.
 - Les heuristiques sont explicables mais ne sont pas un modèle statistique entraîné.
 
@@ -142,7 +142,7 @@ L'application est publiée sur un domaine Vercel managé : `suspecttracker-5ykww
    cp .env.example .env.local
    ```
 
-5. Renseigner `DATABASE_URL`, `SAVE_API_KEY`, `READ_API_KEY` et les variables `AUTH_*` dans `.env.local`.
+5. Renseigner `DATABASE_URL`, `SAVE_API_KEY`, `READ_API_KEY` et `AUTH_JWT_SECRET` dans `.env.local`.
 
 6. Préparer la base.
 
@@ -166,8 +166,6 @@ L'application est publiée sur un domaine Vercel managé : `suspecttracker-5ykww
 | `DATABASE_URL` | Connexion PostgreSQL Neon/Supabase/Vercel Postgres | `postgresql://user:password@host/db?sslmode=require` | Oui pour API DB |
 | `SAVE_API_KEY` | Protège `POST /api/v1/submissions` via `x-save-key` | `r6-save-long-random-key` | Oui en production |
 | `READ_API_KEY` | Protège `GET /api/v1/entries`, `/api/v1/export.csv` et `/api/v1/stats` via `x-read-key` | `r6-read-long-random-key` | Oui en production |
-| `AUTH_USERNAME` | Identifiant admin de démonstration JWT | `admin` | Oui pour `/api/v1/auth/*` |
-| `AUTH_PASSWORD_HASH` | Hash scrypt du mot de passe admin | `scrypt$...` | Oui pour `/api/v1/auth/*` |
 | `AUTH_JWT_SECRET` | Secret HMAC JWT de 32 caractères minimum | `change-me-with-32-random-chars-min` | Oui pour `/api/v1/auth/*` |
 
 ## Tests
@@ -185,7 +183,7 @@ npm run check
 
 ## Choix techniques
 
-Le projet privilégie un MVP déployable et défendable : formulaire statique pour la démonstration, API serverless unique pour Vercel Hobby, service métier côté serveur pour recalculer les verdicts, Prisma pour la persistance et Zod pour valider chaque entrée. La logique d'analyse vit dans `lib/analyze.js`, réutilisée par les tests, par `POST /api/v1/analyze` et par `POST /api/v1/submissions`, ce qui évite toute divergence entre affichage et sauvegarde.
+Le projet privilégie un MVP déployable et défendable : formulaire statique pour la démonstration, API serverless unique pour Vercel Hobby, service métier côté serveur pour recalculer les verdicts, Prisma pour la persistance, Zod pour valider chaque entrée et RBAC PostgreSQL pour les routes sensibles. La logique d'analyse vit dans `lib/analyze.js`, réutilisée par les tests, par `POST /api/v1/analyze` et par `POST /api/v1/submissions`, ce qui évite toute divergence entre affichage et sauvegarde.
 
 ## Documentation complémentaire
 
@@ -201,7 +199,7 @@ Le projet privilégie un MVP déployable et défendable : formulaire statique po
 ## Limites connues
 
 - Domaine Vercel managé avec TLS automatique ; pas de domaine personnalisé acheté séparément.
-- Pas de compte utilisateur public ni de RBAC complet.
+- Pas de self-service public pour créer des comptes ; les comptes démo RBAC sont seedés.
 - Pas d'intégration automatique avec R6 Tracker.
 - Pas de screenshots versionnés pour le moment.
 - Pas de migrations Prisma historiques : le setup local utilise `prisma db push`.

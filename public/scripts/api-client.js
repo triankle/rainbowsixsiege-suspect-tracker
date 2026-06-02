@@ -81,10 +81,19 @@
     return readJsonResponse(response);
   }
 
+  async function logout(token) {
+    const response = await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return readJsonResponse(response);
+  }
+
   global.R6Api = {
     analyzeProfile,
     buildExportCsvUrl,
     login,
+    logout,
     me,
     saveSubmission,
     listEntries,

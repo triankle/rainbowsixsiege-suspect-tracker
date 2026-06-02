@@ -45,6 +45,18 @@ Dans cette architecture, Vercel remplace le reverse proxy que l'on configurerait
 6. `/entries` redirige vers `/entries.html`, qui charge l'historique via `GET /api/v1/entries`.
 7. Les stats et l'export CSV utilisent la même couche service/repository.
 
+## Authentification et RBAC
+
+Les comptes applicatifs sont stockés dans `auth_users` avec un hash `scrypt`, un rôle et un `tokenVersion`.
+
+```text
+admin      -> toutes les permissions
+moderator  -> création, lecture, stats, export
+viewer     -> lecture, stats, export
+```
+
+Le login vérifie l'utilisateur actif en base, émet un JWT court et inclut le rôle. Les routes protégées acceptent soit un JWT avec la permission requise, soit les clés API legacy `x-save-key` / `x-read-key` pour compatibilité avec l'UI statique. Le logout incrémente `tokenVersion`, ce qui invalide réellement les anciens JWT côté serveur.
+
 ## Structure du dépôt
 
 ```text
@@ -72,12 +84,13 @@ Les endpoints publics versionnés sont :
 - `GET /api/v1/stats`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/me`
+- `POST /api/v1/auth/logout`
 
-Les routes d'écriture utilisent `x-save-key` en production. Les routes de lecture de données utilisent `x-read-key` en production. Les erreurs sont normalisées avec `{ error: { code, message, details? } }`.
+Les routes d'écriture utilisent la permission `submissions:create` ou `x-save-key`. Les routes de lecture utilisent les permissions `entries:read`, `stats:read`, `export:read` ou `x-read-key`. Les erreurs sont normalisées avec `{ error: { code, message, details? } }`.
 
 ## Base de données
 
-La base PostgreSQL contient une table principale `suspect_submissions`. Les colonnes stockent les stats saisies, le verdict recalculé serveur, les scores et les raisons JSON.
+La base PostgreSQL contient `suspect_submissions` pour les analyses et `auth_users` pour l'authentification RBAC.
 
 Les index utiles sont :
 
@@ -94,6 +107,7 @@ Les index utiles sont :
 - Secrets hors repo via `.env.local` ou Vercel Environment Variables.
 - Gitleaks en CI.
 - Hash admin `scrypt`, JWT HMAC SHA-256 expirant en 15 minutes.
+- Logout serveur via `tokenVersion`.
 
 ## Tests et qualité
 
@@ -107,11 +121,11 @@ npm run vercel-build
 npm run check
 ```
 
-Les tests couvrent le moteur d'analyse, la validation API, l'authentification, le routeur API, le service qui recalcule l'analyse côté serveur et un parcours E2E Playwright sur le formulaire principal.
+Les tests couvrent le moteur d'analyse, la validation API, l'authentification DB/RBAC, la révocation de token, le routeur API, le service qui recalcule l'analyse côté serveur et un parcours E2E Playwright sur le formulaire principal.
 
 ## Limites assumées
 
-- Pas de compte utilisateur public ni de RBAC complet.
+- Pas de self-service public pour créer des comptes ; les comptes RBAC sont seedés ou gérés en base.
 - Domaine Vercel managé avec TLS automatique ; pas de domaine personnalisé acheté séparément.
 - Pas de scraping R6 Tracker.
 - Pas de modèle IA entraîné.

@@ -7,7 +7,10 @@ const {
   authenticateCredentials,
   createToken,
   requireBearerAuth,
+  requirePermission,
+  revokeCurrentUserTokens,
   TOKEN_TTL_SECONDS,
+  verifyApiKey,
 } = require('../lib/auth.js');
 const {
   AuthenticationError,
@@ -29,6 +32,33 @@ const {
   submissionSchema,
 } = require('../lib/validation.js');
 const { createSubmissionService } = require('../lib/services/submission-service.js');
+
+function getHeader(req, name) {
+  const lower = name.toLowerCase();
+  return req.headers[name] || req.headers[lower];
+}
+
+function hasBearerToken(req) {
+  return Boolean(getHeader(req, 'authorization'));
+}
+
+async function authorizeWithKeyOrPermission(req, getPrismaForAuth, headerName, envName, permission) {
+  const configuredKey = process.env[envName];
+  const providedKey = getHeader(req, headerName);
+  if (verifyApiKey(providedKey, configuredKey)) {
+    return { authType: 'api-key', permission };
+  }
+  if (configuredKey && providedKey && !verifyApiKey(providedKey, configuredKey)) {
+    throw new AuthenticationError(`Invalid ${headerName}`);
+  }
+  if (hasBearerToken(req)) {
+    return requirePermission(req, getPrismaForAuth(), permission);
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new AuthenticationError(`${envName} or Bearer token must be configured and provided in production.`);
+  }
+  return { authType: 'development', permission };
+}
 
 function getRoutePath(req) {
   const fromQuery = req.query && req.query.path;
@@ -68,18 +98,12 @@ async function handleSubmissions(req, res) {
 
   requireMethod(req, ['POST']);
 
-  const saveSecret = process.env.SAVE_API_KEY;
-  if (process.env.NODE_ENV === 'production' && !saveSecret) {
-    throw new AuthenticationError('SAVE_API_KEY must be configured in production.');
-  }
-  if (saveSecret && req.headers['x-save-key'] !== saveSecret) {
-    throw new AuthenticationError('Invalid or missing save key');
-  }
-
+  await authorizeWithKeyOrPermission(req, getPrisma, 'x-save-key', 'SAVE_API_KEY', 'submissions:create');
   requireDatabaseUrl();
+  const prisma = getPrisma();
 
   const input = parseOrThrow(submissionSchema, parseJsonBody(req.body));
-  const { row, analysis } = await createSubmissionService(getPrisma()).createSubmission(input);
+  const { row, analysis } = await createSubmissionService(prisma).createSubmission(input);
 
   return sendJson(res, 201, {
     data: {
@@ -119,18 +143,12 @@ async function handleEntries(req, res) {
 
   requireMethod(req, ['GET']);
 
-  const readSecret = process.env.READ_API_KEY;
-  if (process.env.NODE_ENV === 'production' && !readSecret) {
-    throw new AuthenticationError('READ_API_KEY must be configured in production.');
-  }
-  if (readSecret && req.headers['x-read-key'] !== readSecret) {
-    throw new AuthenticationError('Invalid or missing read key');
-  }
-
+  await authorizeWithKeyOrPermission(req, getPrisma, 'x-read-key', 'READ_API_KEY', 'entries:read');
   requireDatabaseUrl();
+  const prisma = getPrisma();
 
   const query = parseOrThrow(entriesQuerySchema, getQuery(req));
-  const { rows, total } = await createSubmissionService(getPrisma()).listEntries(query);
+  const { rows, total } = await createSubmissionService(prisma).listEntries(query);
 
   return sendJson(res, 200, {
     data: rows,
@@ -159,17 +177,12 @@ async function handleStats(req, res) {
   }
 
   requireMethod(req, ['GET']);
-  const readSecret = process.env.READ_API_KEY;
-  if (process.env.NODE_ENV === 'production' && !readSecret) {
-    throw new AuthenticationError('READ_API_KEY must be configured in production.');
-  }
-  if (readSecret && req.headers['x-read-key'] !== readSecret) {
-    throw new AuthenticationError('Invalid or missing read key');
-  }
   parseOrThrow(emptyQuerySchema, getQuery(req));
+  await authorizeWithKeyOrPermission(req, getPrisma, 'x-read-key', 'READ_API_KEY', 'stats:read');
   requireDatabaseUrl();
+  const prisma = getPrisma();
 
-  const payload = await createSubmissionService(getPrisma()).getStats();
+  const payload = await createSubmissionService(prisma).getStats();
 
   return sendJson(res, 200, {
     data: payload,
@@ -186,17 +199,11 @@ async function handleExportCsv(req, res) {
   }
 
   requireMethod(req, ['GET']);
-  const readSecret = process.env.READ_API_KEY;
-  if (process.env.NODE_ENV === 'production' && !readSecret) {
-    throw new AuthenticationError('READ_API_KEY must be configured in production.');
-  }
-  if (readSecret && req.headers['x-read-key'] !== readSecret) {
-    throw new AuthenticationError('Invalid or missing read key');
-  }
-
+  await authorizeWithKeyOrPermission(req, getPrisma, 'x-read-key', 'READ_API_KEY', 'export:read');
   requireDatabaseUrl();
+  const prisma = getPrisma();
   const query = parseOrThrow(entriesQuerySchema, getQuery(req));
-  const rows = await createSubmissionService(getPrisma()).getExportRows(query);
+  const rows = await createSubmissionService(prisma).getExportRows(query);
 
   const header = [
     'createdAt',
@@ -249,9 +256,10 @@ async function handleAuthLogin(req, res) {
   }
 
   requireMethod(req, ['POST']);
+  requireDatabaseUrl();
   const input = parseOrThrow(loginSchema, parseJsonBody(req.body));
-  const user = authenticateCredentials(input.username, input.password);
-  const token = createToken(user.username);
+  const user = await authenticateCredentials(getPrisma(), input.username, input.password);
+  const token = createToken(user);
 
   return sendJson(res, 200, {
     data: {
@@ -272,12 +280,33 @@ async function handleAuthMe(req, res) {
   }
 
   requireMethod(req, ['GET']);
-  const payload = requireBearerAuth(req);
+  requireDatabaseUrl();
+  const user = await requireBearerAuth(req, getPrisma());
   return sendJson(res, 200, {
     data: {
-      username: payload.sub,
-      role: payload.role,
-      expiresAt: new Date(payload.exp * 1000).toISOString(),
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      expiresAt: new Date(user.exp * 1000).toISOString(),
+    },
+  });
+}
+
+async function handleAuthLogout(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization');
+    return sendEmpty(res, 204);
+  }
+
+  requireMethod(req, ['POST']);
+  requireDatabaseUrl();
+  await revokeCurrentUserTokens(req, getPrisma());
+  return sendJson(res, 200, {
+    data: {
+      revoked: true,
     },
   });
 }
@@ -290,6 +319,7 @@ const routes = {
   '/export.csv': handleExportCsv,
   '/auth/login': handleAuthLogin,
   '/auth/me': handleAuthMe,
+  '/auth/logout': handleAuthLogout,
 };
 
 module.exports = async function handler(req, res) {
