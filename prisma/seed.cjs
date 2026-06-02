@@ -1,65 +1,107 @@
 const { PrismaClient } = require('@prisma/client');
+const { hashPassword } = require('../lib/auth.js');
+const { toCreateData } = require('../lib/services/submission-service.js');
 
 const prisma = new PrismaClient();
 
-const demoRows = [
+const demoInputs = [
   {
     pseudo: 'Demo.Clean',
     kd: 1.12,
     winrate: 51.8,
-    rankedMatches: 420,
-    accountLevel: 188,
+    ranked: 420,
+    level: 188,
     rankKey: 'gold',
-    seasonsPlayed: [12, 13, 14, 15, 16, 17, 18],
-    verdict: 'clean',
-    verdictLabel: 'Profile looks consistent with normal ranked history.',
-    cheatScore: 18,
-    smurfScore: 12,
-    reasonsJson: [
-      { type: 'positive', text: 'Large ranked sample size.' },
-      { type: 'positive', text: 'Several ranked seasons played.' },
-    ],
+    playedSeasons: [12, 13, 14, 15, 16, 17, 18],
   },
   {
     pseudo: 'Demo.Smurf',
     kd: 1.76,
     winrate: 63.4,
-    rankedMatches: 82,
-    accountLevel: 57,
+    ranked: 82,
+    level: 57,
     rankKey: 'platinum',
-    seasonsPlayed: [18],
-    verdict: 'smurf',
-    verdictLabel: 'Strong smurf-like signals: low level, strong rank, only current season.',
-    cheatScore: 38,
-    smurfScore: 82,
-    reasonsJson: [
-      { type: 'negative', text: 'Low account level for ranked performance.' },
-      { type: 'negative', text: 'Only current ranked season selected.' },
-    ],
+    playedSeasons: [18],
   },
   {
     pseudo: 'Demo.Suspect',
     kd: 2.35,
     winrate: 78.1,
-    rankedMatches: 64,
-    accountLevel: 91,
+    ranked: 64,
+    level: 91,
     rankKey: 'emerald',
-    seasonsPlayed: [17, 18],
-    verdict: 'suspect',
-    verdictLabel: 'Very high K/D and win rate on a small ranked sample.',
-    cheatScore: 88,
-    smurfScore: 46,
-    reasonsJson: [
-      { type: 'negative', text: 'K/D is extremely high for the sample size.' },
-      { type: 'negative', text: 'Win rate is abnormally high.' },
-    ],
+    playedSeasons: [17, 18],
+  },
+  {
+    pseudo: 'Demo.Uncertain',
+    kd: 1.42,
+    winrate: 58.4,
+    ranked: 145,
+    level: 132,
+    rankKey: 'gold',
+    playedSeasons: [15, 16, 18],
+  },
+  {
+    pseudo: 'Demo.Veteran',
+    kd: 1.28,
+    winrate: 54.2,
+    ranked: 680,
+    level: 241,
+    rankKey: 'diamond',
+    playedSeasons: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+  },
+];
+
+const demoUsers = [
+  {
+    username: 'admin',
+    email: 'admin@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'ADMIN',
+  },
+  {
+    username: 'moderator',
+    email: 'moderator@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'MODERATOR',
+  },
+  {
+    username: 'viewer',
+    email: 'viewer@demo.local',
+    password: 'Demo1234!Demo',
+    role: 'VIEWER',
   },
 ];
 
 async function main() {
-  for (const row of demoRows) {
-    await prisma.suspectSubmission.create({ data: row });
+  for (const user of demoUsers) {
+    await prisma.authUser.upsert({
+      where: { username: user.username },
+      update: {
+        email: user.email,
+        role: user.role,
+        isActive: true,
+        passwordHash: hashPassword(user.password),
+        tokenVersion: { increment: 1 },
+      },
+      create: {
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: true,
+        passwordHash: hashPassword(user.password),
+      },
+    });
   }
+
+  const pseudos = demoInputs.map((row) => row.pseudo);
+  await prisma.suspectSubmission.deleteMany({
+    where: { pseudo: { in: pseudos } },
+  });
+  await prisma.suspectSubmission.createMany({
+    data: demoInputs.map((input) => toCreateData(input)),
+  });
+  console.log(`Seeded ${demoUsers.length} demo users and ${demoInputs.length} demo suspect submissions.`);
 }
 
 main()

@@ -24,7 +24,7 @@
   <main>
     <section class="form-section">
       <h2>Admin login</h2>
-      <p class="hint">Credentials are configured with AUTH_USERNAME, AUTH_PASSWORD_HASH and AUTH_JWT_SECRET. The password is never stored in plain text.</p>
+      <p class="hint">Demo users are stored in PostgreSQL with a scrypt password hash and an RBAC role. Seed creates <code>admin</code>, <code>moderator</code> and <code>viewer</code> with password <code>Demo1234!Demo</code>.</p>
       <p id="auth-feedback" class="form-error hidden" role="status"></p>
       <form id="auth-form">
         <div class="field">
@@ -37,6 +37,7 @@
         </div>
         <button type="submit">Login</button>
       </form>
+      <button type="button" id="auth-logout" class="btn-save-db hidden">Logout and revoke token</button>
       <pre id="auth-result" class="hidden"></pre>
     </section>
   </main>
@@ -46,6 +47,8 @@
     const form = document.getElementById('auth-form');
     const feedback = document.getElementById('auth-feedback');
     const result = document.getElementById('auth-result');
+    const logoutButton = document.getElementById('auth-logout');
+    let currentToken = null;
 
     function setFeedback(message, ok) {
       feedback.textContent = message;
@@ -62,12 +65,26 @@
       const password = document.getElementById('auth-password').value;
       try {
         const loginResponse = await window.R6Api.login(username, password);
+        currentToken = loginResponse.data.token;
         const profileResponse = await window.R6Api.me(loginResponse.data.token);
         result.textContent = JSON.stringify({ login: loginResponse.data, me: profileResponse.data }, null, 2);
         result.classList.remove('hidden');
-        setFeedback('Authenticated. JWT verified with /api/v1/auth/me.', true);
+        logoutButton.classList.remove('hidden');
+        setFeedback(`Authenticated as ${profileResponse.data.role}. JWT verified with /api/v1/auth/me.`, true);
       } catch (err) {
         setFeedback(err.message || 'Authentication failed.', false);
+      }
+    });
+
+    logoutButton.addEventListener('click', async () => {
+      if (!currentToken) return;
+      try {
+        await window.R6Api.logout(currentToken);
+        currentToken = null;
+        logoutButton.classList.add('hidden');
+        setFeedback('Logged out. Server incremented tokenVersion, so the JWT is revoked.', true);
+      } catch (err) {
+        setFeedback(err.message || 'Logout failed.', false);
       }
     });
   </script>

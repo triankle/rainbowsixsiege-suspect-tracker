@@ -2,15 +2,16 @@
 
 ## Modèle de sécurité
 
-R6 Suspect Check n'a pas de comptes publics multi-utilisateurs. Le modèle choisi est stateless : le navigateur appelle des fonctions serverless Vercel, les actions sensibles sont protégées par des clés configurées côté serveur, et une authentification admin JWT de démonstration permet de valider le parcours login sécurisé.
+R6 Suspect Check utilise une authentification stateless par JWT, avec utilisateurs stockés dans PostgreSQL et rôles RBAC (`admin`, `moderator`, `viewer`). Les anciennes clés `SAVE_API_KEY` et `READ_API_KEY` restent acceptées comme compatibilité pour l'UI statique, mais les routes sensibles savent aussi valider un `Authorization: Bearer <token>`.
 
 | Action | Protection |
 | --- | --- |
-| Enregistrer une analyse | Header `x-save-key` comparé à `SAVE_API_KEY`. |
-| Lire l'historique | Header `x-read-key` comparé à `READ_API_KEY`. |
-| Lire les statistiques | Public, uniquement agrégé. |
-| Login admin | Mot de passe vérifié avec hash `scrypt` et JWT HMAC court. |
+| Enregistrer une analyse | Permission `submissions:create` (`admin`, `moderator`) ou header legacy `x-save-key`. |
+| Lire l'historique | Permission `entries:read` (`admin`, `moderator`, `viewer`) ou header legacy `x-read-key`. |
+| Lire les statistiques | Permission `stats:read` (`admin`, `moderator`, `viewer`) ou header legacy `x-read-key`. |
+| Login | Mot de passe vérifié avec hash `scrypt`, utilisateur actif en base et JWT HMAC court. |
 | Lire `/api/v1/auth/me` | Header `Authorization: Bearer <token>`. |
+| Logout | Incrémente `tokenVersion` en base pour révoquer les JWT existants. |
 | Accéder à PostgreSQL | Impossible depuis le client ; `DATABASE_URL` reste côté serveur. |
 
 ## Secrets
@@ -27,29 +28,35 @@ Les secrets de production sont injectés dans Vercel Environment Variables :
 - `DATABASE_URL`
 - `SAVE_API_KEY`
 - `READ_API_KEY`
-- `AUTH_USERNAME`
-- `AUTH_PASSWORD_HASH`
 - `AUTH_JWT_SECRET`
 
 Le fichier `.env.example` contient uniquement des valeurs factices ou commentées.
 
-## Authentification admin JWT
+## Authentification JWT et RBAC
 
-Le projet fournit une authentification admin légère pour démontrer le critère sécurité sans introduire de comptes publics multi-utilisateurs :
+Le seed crée trois utilisateurs de démonstration :
 
-1. Le mot de passe admin n'est jamais stocké en clair.
-2. `npm run auth:hash -- "mot-de-passe-long"` génère un hash `scrypt`.
-3. `/api/v1/auth/login` vérifie le hash avec comparaison en temps constant.
-4. `/api/v1/auth/me` vérifie un JWT HMAC SHA-256 avec expiration courte de 15 minutes.
-5. Les secrets sont lus depuis l'environnement et doivent être injectés par l'hébergeur.
+| Username | Rôle | Permissions |
+| --- | --- | --- |
+| `admin` | `admin` | Toutes les permissions applicatives. |
+| `moderator` | `moderator` | Analyse, création, lecture, stats, export. |
+| `viewer` | `viewer` | Analyse, lecture, stats, export. |
+
+1. Les mots de passe ne sont jamais stockés en clair.
+2. `prisma/seed.cjs` génère des hash `scrypt`.
+3. `/api/v1/auth/login` vérifie l'utilisateur, le hash et le statut `isActive`.
+4. Le JWT contient `sub`, `username`, `role`, `tokenVersion`, `iat` et `exp`.
+5. `/api/v1/auth/me` recharge l'utilisateur en base et vérifie que `tokenVersion` correspond.
+6. `/api/v1/auth/logout` incrémente `tokenVersion`, ce qui révoque les anciens JWT.
 
 ## Validation des entrées
 
 Les endpoints utilisent `zod` via `lib/validation.js` :
 
-- `submissionSchema` pour `POST /api/submissions`.
-- `entriesQuerySchema` pour `GET /api/entries`.
-- `emptyQuerySchema` pour `GET /api/stats`.
+- `analysisInputSchema` pour `POST /api/v1/analyze`.
+- `submissionSchema` pour `POST /api/v1/submissions`.
+- `entriesQuerySchema` pour `GET /api/v1/entries` et `GET /api/v1/export.csv`.
+- `emptyQuerySchema` pour `GET /api/v1/stats`.
 - `loginSchema` pour `POST /api/v1/auth/login`.
 
 Les erreurs de validation retournent un JSON normalisé avec `field`, `code` et `message`.
@@ -61,7 +68,10 @@ Les erreurs de validation retournent un JSON normalisé avec `field`, `code` et 
 - `AppError`
 - `ValidationError`
 - `AuthenticationError`
+- `AuthorizationError`
 - `ConfigurationError`
+- `ConflictError`
+- `NotFoundError`
 - `handleApiError()`
 
 En production, les erreurs internes sont masquées et ne renvoient pas de stacktrace au client.
@@ -82,7 +92,7 @@ L'application n'utilise pas de cookie de session. Les actions d'écriture repose
 
 ### Headers HTTP
 
-`next.config.ts` définit les headers globaux suivants :
+`next.config.ts` applique les headers globaux suivants via `headers()` :
 
 - `Content-Security-Policy`
 - `Strict-Transport-Security`
@@ -91,7 +101,7 @@ L'application n'utilise pas de cookie de session. Les actions d'écriture repose
 - `Referrer-Policy`
 - `Permissions-Policy`
 
-Les endpoints API ajoutent aussi les headers de base via `setSecurityHeaders()`.
+Les endpoints API ajoutent aussi les headers de base via `setSecurityHeaders()`, avec HSTS en production.
 
 ## CI sécurité
 
@@ -99,6 +109,6 @@ Le workflow GitHub Actions lance Gitleaks pour détecter les secrets accidentell
 
 ## Limites assumées
 
-- Pas de comptes utilisateurs, donc pas de RBAC complet.
+- Pas de self-service public pour créer des comptes ; les utilisateurs sont seedés ou administrés côté base.
 - Pas de rate limiting applicatif dédié ; Vercel fournit une première couche d'isolation, mais une protection dédiée serait nécessaire pour une app publique à fort trafic.
 - La CSP autorise `unsafe-inline` pour conserver le HTML statique actuel ; une migration vers scripts/styles hashés permettrait de la durcir davantage.

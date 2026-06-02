@@ -29,7 +29,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Pas d'export statique pour permettre les fonctions API
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,30 +1,15 @@
 /**
- * R6 Suspect Check — ranked-only heuristics for “cheat-like” vs “smurf-like” profiles.
- * Bump this when a new ranked season starts (highest index = current).
+ * R6 Suspect Check UI.
+ * The analysis rules live server-side in lib/analyze.js and are exposed by /api/v1/analyze.
  */
 const CURRENT_SEASON_NUM = 18;
-
 const MIN_LEVEL_FOR_RANKED = 50;
-/** Gap between two played season numbers → “skipped” seasons; >= this suggests smurf breaks. */
-const SMURF_GAP_SEASONS = 4;
-
-const RANK_ORDER = {
-  copper: 1,
-  bronze: 2,
-  silver: 3,
-  gold: 4,
-  platinum: 5,
-  emerald: 6,
-  diamond: 7,
-  champion: 8,
-};
 
 const form = document.getElementById('stats-form');
 const resultSection = document.getElementById('result-section');
 const resultContent = document.getElementById('result-content');
 const formError = document.getElementById('form-error');
 
-/** Snapshot for optional POST /api/submissions after analysis */
 let pendingSavePayload = null;
 
 function buildSeasonCheckboxes() {
@@ -56,343 +41,6 @@ function getPlayedSeasons() {
   return nums.filter((n) => !Number.isNaN(n)).sort((a, b) => a - b);
 }
 
-/** Match volume → confidence in scores (prompt: <100 unreliable, 100–300 medium, >300 high). */
-function matchConfidence(ranked) {
-  if (ranked < 100) {
-    return {
-      label: 'low',
-      cheatMult: 0.72,
-      smurfMult: 1.18,
-      unreliableBoost: 14,
-    };
-  }
-  if (ranked <= 300) {
-    return { label: 'medium', cheatMult: 1, smurfMult: 1, unreliableBoost: 0 };
-  }
-  return { label: 'high', cheatMult: 1.06, smurfMult: 0.94, unreliableBoost: 0 };
-}
-
-/** Base K/D suspicion (cheat axis) before rank context. */
-function kdBaseCheat(kd) {
-  if (kd < 1.0) return 0;
-  if (kd < 1.4) return 10;
-  if (kd < 1.8) return 34;
-  if (kd < 2.2) return 58;
-  return 84;
-}
-
-/**
- * High rank: same K/D is harder to sustain legit → cheat weight ↑.
- * Low rank (silver/gold…): strong K/D often reads as smurf / good aim, not wallhacks → cheat weight ↓.
- */
-function rankKdCheatMultiplier(rankStep) {
-  if (rankStep >= RANK_ORDER.champion) return 1.22;
-  if (rankStep >= RANK_ORDER.diamond) return 1.18;
-  if (rankStep >= RANK_ORDER.emerald) return 1.12;
-  if (rankStep >= RANK_ORDER.platinum) return 1.05;
-  if (rankStep >= RANK_ORDER.gold) return 0.88;
-  if (rankStep >= RANK_ORDER.silver) return 0.82;
-  if (rankStep > 0) return 0.78;
-  return 0.9;
-}
-
-/** Extra smurf signal when K/D is strong but lobby rank is low (mechanical smurf / alt). */
-function rankKdSmurfBoost(kd, rankStep) {
-  if (kd < 1.35 || rankStep <= 0) return 0;
-  if (rankStep <= RANK_ORDER.gold) {
-    return Math.min(38, (kd - 1.35) * 48);
-  }
-  if (rankStep === RANK_ORDER.platinum && kd >= 1.5 && kd < 2.0) {
-    return Math.min(18, (kd - 1.45) * 28);
-  }
-  return 0;
-}
-
-function winrateCheatContribution(winrate, hasWinrate) {
-  if (!hasWinrate) return 0;
-  if (winrate < 45) return 0;
-  if (winrate <= 55) return 0;
-  if (winrate <= 60) return 10;
-  if (winrate <= 65) return 26;
-  if (winrate <= 75) return 44;
-  return 64;
-}
-
-function largestSeasonGap(sortedSeasons) {
-  if (sortedSeasons.length < 2) return 0;
-  let maxGap = 0;
-  for (let i = 0; i < sortedSeasons.length - 1; i++) {
-    const skipped = sortedSeasons[i + 1] - sortedSeasons[i] - 1;
-    if (skipped > maxGap) maxGap = skipped;
-  }
-  return maxGap;
-}
-
-function onlyCurrentSeasonPlayed(sortedSeasons) {
-  return (
-    sortedSeasons.length === 1 && sortedSeasons[0] === CURRENT_SEASON_NUM
-  );
-}
-
-function analyzeProfile(input) {
-  const reasons = [];
-  let cheatRaw = 0;
-  let smurfRaw = 0;
-
-  const {
-    kd,
-    winrate,
-    ranked,
-    level,
-    rankStep,
-    rankKey,
-    playedSeasons,
-  } = input;
-
-  const hasWinrate = winrate !== undefined && !Number.isNaN(winrate);
-  const conf = matchConfidence(ranked);
-  const rankLabel = rankKey || 'not set';
-
-  reasons.push({
-    text: `Confidence: ${conf.label} (${ranked} ranked matches — ${ranked < 100 ? 'sample unreliable for strong conclusions' : ranked <= 300 ? 'medium statistical weight' : 'high statistical weight'}).`,
-    type: '',
-  });
-
-  // --- K/D (tier + rank context) ---
-  const kdCheatBase = kdBaseCheat(kd);
-  const rankMult = rankKdCheatMultiplier(rankStep);
-  let kdCheat = kdCheatBase * rankMult;
-  const smurfFromKdRank = rankKdSmurfBoost(kd, rankStep);
-  smurfRaw += smurfFromKdRank;
-
-  if (rankStep >= RANK_ORDER.emerald && kd >= 1.4 && kd < 1.8) {
-    reasons.push({
-      text: `K/D ${kd} in ${rankLabel} lobbies: very strong for rank — shifts toward cheat-style suspicion more than in low ranks.`,
-      type: 'negative',
-    });
-  } else if (
-    rankStep > 0 &&
-    rankStep <= RANK_ORDER.gold &&
-    kd >= 1.4 &&
-    kd < 1.85
-  ) {
-    reasons.push({
-      text: `K/D ${kd} in ${rankLabel}: often reads as smurf or very strong player; less cheat-likely than the same K/D in Emerald+.`,
-      type: 'negative',
-    });
-  }
-
-  cheatRaw += kdCheat;
-
-  reasons.push({
-    text: `K/D ${kd} → base cheat weight ${Math.round(kdCheatBase)}, rank multiplier ×${rankMult.toFixed(2)} (${rankLabel}) → ${Math.round(kdCheat)} toward cheat axis.`,
-    type: kdCheat >= 35 ? 'negative' : 'positive',
-  });
-
-  if (smurfFromKdRank > 0) {
-    reasons.push({
-      text: `Rank context adds +${Math.round(smurfFromKdRank)} smurf-style (strong stats in lower lobby / plat gate).`,
-      type: 'negative',
-    });
-  }
-
-  // --- Win rate ---
-  const wrCheat = winrateCheatContribution(winrate, hasWinrate);
-  cheatRaw += wrCheat;
-  if (wrCheat > 0) {
-    reasons.push({
-      text: `Win rate ${hasWinrate ? `${winrate}%` : 'n/a'} → +${wrCheat} toward cheat (${winrate > 75 ? 'extremely suspicious band' : winrate > 65 ? 'suspicious' : 'elevated'}).`,
-      type: 'negative',
-    });
-  }
-  if (hasWinrate && winrate >= 45 && winrate <= 55 && ranked >= 150) {
-    cheatRaw -= 8;
-    reasons.push({
-      text: `Win rate ${winrate}% in normal band (45–55%) with enough games — lowers cheat noise.`,
-      type: 'positive',
-    });
-  }
-
-  if (conf.unreliableBoost > 0) {
-    smurfRaw += conf.unreliableBoost;
-    reasons.push({
-      text: `Few matches: +${conf.unreliableBoost} smurf-style (boost / alt / unreliable sample). Cheat/smurf axes scaled by confidence after all rules.`,
-      type: 'negative',
-    });
-  }
-
-  // --- Account level ---
-  if (level < 80 && (kd >= 1.5 || (hasWinrate && winrate > 60))) {
-    smurfRaw += 24;
-    reasons.push({
-      text: `Level ${level} with strong combat stats → strong smurf / alt signal (prompt: <80 + strong stats).`,
-      type: 'negative',
-    });
-  }
-  if (level < 120 && kd >= 1.8) {
-    cheatRaw += 12;
-    smurfRaw += 14;
-    reasons.push({
-      text: `Level ${level} with very high K/D (${kd}) → suspicious; split between smurf and cheat risk.`,
-      type: 'negative',
-    });
-  }
-  if (level > 150) {
-    smurfRaw -= 14;
-    cheatRaw -= 10;
-    reasons.push({
-      text: `Level ${level} → more credible main (reduces smurf/cheat noise).`,
-      type: 'positive',
-    });
-  }
-
-  // --- Seasons played ---
-  const nSeasons = playedSeasons.length;
-  if (nSeasons <= 2) {
-    smurfRaw += 20;
-    reasons.push({
-      text: `Only ${nSeasons} ranked season(s) ticked → smurf indicator (1–2 seasons).`,
-      type: 'negative',
-    });
-  } else if (nSeasons >= 3 && nSeasons <= 5) {
-    reasons.push({
-      text: `${nSeasons} seasons → normal “active account” band.`,
-      type: 'positive',
-    });
-  } else if (nSeasons > 6) {
-    smurfRaw -= 14;
-    cheatRaw -= 6;
-    reasons.push({
-      text: `${nSeasons} seasons → established account (reduces smurf prior).`,
-      type: 'positive',
-    });
-  }
-
-  // --- Season pattern extras ---
-  if (onlyCurrentSeasonPlayed(playedSeasons)) {
-    cheatRaw += 22;
-    smurfRaw += 18;
-    reasons.push({
-      text: 'Only current season ranked — new account / boost / volatile pattern.',
-      type: 'negative',
-    });
-  }
-
-  const bigGap = largestSeasonGap(playedSeasons);
-  if (bigGap >= SMURF_GAP_SEASONS) {
-    smurfRaw += Math.min(36, 10 + bigGap * 2.5);
-    reasons.push({
-      text: `Large season gap (${bigGap} skipped) — sporadic alt pattern.`,
-      type: 'negative',
-    });
-  }
-
-  if (nSeasons >= 6 && bigGap < SMURF_GAP_SEASONS) {
-    smurfRaw -= 12;
-    cheatRaw -= 6;
-    reasons.push({
-      text: 'Many seasons without long breaks — looks like a main.',
-      type: 'positive',
-    });
-  }
-
-  // --- Consistency: high K/D + many matches → cheat; high K/D + low level → smurf ---
-  if (ranked > 300 && kd >= 1.8) {
-    cheatRaw += 16;
-    reasons.push({
-      text: 'High K/D sustained over 300+ ranked matches → cheat suspicion increases (consistency rule).',
-      type: 'negative',
-    });
-  }
-  if (level < 100 && kd >= 1.5) {
-    smurfRaw += 16;
-    reasons.push({
-      text: 'High K/D with account level under 100 → smurf suspicion increases (consistency rule).',
-      type: 'negative',
-    });
-  }
-
-  cheatRaw *= conf.cheatMult;
-  smurfRaw *= conf.smurfMult;
-
-  let cheatScore = Math.max(0, Math.min(100, Math.round(cheatRaw)));
-  let smurfScore = Math.max(0, Math.min(100, Math.round(smurfRaw)));
-
-  const baseMax = Math.max(cheatScore, smurfScore);
-  let finalScore = baseMax;
-  if (conf.label === 'low') {
-    finalScore = Math.min(100, Math.round(baseMax * 0.86));
-  } else if (conf.label === 'high' && ranked > 300 && kd >= 1.75) {
-    finalScore = Math.min(100, Math.round(baseMax * 1.04));
-  }
-
-  let classification = 'mixed — manual review';
-  if (finalScore < 38 && cheatScore < 36 && smurfScore < 38) {
-    classification = 'legit';
-  } else if (smurfScore >= cheatScore + 14 && smurfScore >= 42) {
-    classification = 'smurf';
-  } else if (cheatScore >= smurfScore + 14 && cheatScore >= 42) {
-    classification = 'possible cheater';
-  } else if (finalScore >= 72) {
-    classification =
-      cheatScore >= smurfScore ? 'possible cheater' : 'smurf';
-  } else if (finalScore >= 55 && (cheatScore >= 50 || smurfScore >= 50)) {
-    classification =
-      cheatScore > smurfScore ? 'possible cheater' : 'smurf';
-  }
-
-  const analysis = `Classification: ${classification}. Confidence ${conf.label}. Final suspicion ${finalScore}/100 (50≈suspicious, 75+ very suspicious, 90+ highly abnormal). Cheat axis ${cheatScore}, smurf axis ${smurfScore}.`;
-
-  reasons.push({
-    text: analysis,
-    type:
-      classification === 'legit'
-        ? 'positive'
-        : classification.includes('cheater')
-          ? 'negative'
-          : 'negative',
-  });
-
-  let verdict = 'uncertain';
-  let verdictLabel = 'Inconclusive';
-  let verdictClass = 'uncertain';
-
-  if (classification === 'legit') {
-    verdict = 'clean';
-    verdictLabel = 'Legit — within normal competitive ranges';
-    verdictClass = 'clean';
-  } else if (classification === 'smurf') {
-    verdict = 'smurf';
-    verdictLabel = 'Smurf / alt — pattern fits secondary account';
-    verdictClass = 'smurf';
-  } else if (classification === 'possible cheater') {
-    verdict = 'suspect';
-    verdictLabel = 'Possible cheater — stats warrant scrutiny (not proof)';
-    verdictClass = 'suspect';
-  } else if (finalScore >= 50) {
-    verdict = 'uncertain';
-    verdictLabel = `Elevated suspicion (${finalScore}/100) — mixed smurf/cheat signals`;
-    verdictClass = 'uncertain';
-  } else {
-    verdict = 'uncertain';
-    verdictLabel = 'Mixed / low confidence — manual review';
-    verdictClass = 'uncertain';
-  }
-
-  return {
-    verdict,
-    verdictLabel,
-    verdictClass,
-    cheatScore,
-    smurfScore,
-    finalScore,
-    confidence: conf.label,
-    classification,
-    analysis,
-    reasons,
-  };
-}
-
 function showFormError(message) {
   formError.textContent = message;
   formError.classList.remove('hidden');
@@ -404,12 +52,63 @@ function hideFormError() {
 }
 
 function escapeHtml(text) {
-  const s = String(text);
-  return s
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function setFormLoading(isLoading) {
+  const button = form.querySelector('button[type="submit"]');
+  if (!button) return;
+  button.disabled = isLoading;
+  button.textContent = isLoading ? 'Analyzing...' : 'Analyze profile';
+}
+
+function readFormPayload() {
+  const level = parseInt(document.getElementById('level').value, 10);
+  if (!Number.isFinite(level) || level < MIN_LEVEL_FOR_RANKED) {
+    throw new Error(
+      `Ranked is only available from level ${MIN_LEVEL_FOR_RANKED} in-game. Add a level of ${MIN_LEVEL_FOR_RANKED} or higher, or this ranked profile is not usable here.`
+    );
+  }
+
+  const playedSeasons = getPlayedSeasons();
+  if (playedSeasons.length === 0) {
+    throw new Error('Tick at least one ranked season this account has played.');
+  }
+
+  const kd = parseFloat(document.getElementById('kd').value) || 0;
+  const winrateRaw = document.getElementById('winrate').value;
+  const winrate = winrateRaw === '' ? null : parseFloat(winrateRaw);
+  const ranked = parseInt(document.getElementById('ranked').value, 10) || 0;
+  const rankKey = document.getElementById('rank').value;
+
+  return {
+    pseudo: document.getElementById('pseudo').value.trim() || null,
+    kd,
+    winrate: Number.isNaN(winrate) ? null : winrate,
+    ranked,
+    level,
+    rankKey: rankKey || null,
+    playedSeasons,
+  };
+}
+
+function buildSavePayload(input, analysis) {
+  return {
+    ...input,
+    verdict: analysis.verdict,
+    verdictLabel: analysis.verdictLabel,
+    cheatScore: analysis.cheatScore,
+    smurfScore: analysis.smurfScore,
+    finalScore: analysis.finalScore,
+    confidence: analysis.confidence,
+    classification: analysis.classification,
+    analysis: analysis.analysis,
+    reasons: analysis.reasons,
+  };
 }
 
 function displayResult(analysis) {
@@ -425,12 +124,14 @@ function displayResult(analysis) {
   } = analysis;
 
   const finalVal =
-    typeof finalScore === 'number' ? Math.round(finalScore) : Math.max(cheatScore, smurfScore);
+    typeof finalScore === 'number'
+      ? Math.round(finalScore)
+      : Math.max(cheatScore, smurfScore);
   const confLabel = confidence || '—';
   const classLabel = classification || '—';
 
   resultContent.innerHTML = `
-    <div class="verdict ${verdictClass}">${escapeHtml(verdictLabel)}</div>
+    <div class="verdict ${escapeHtml(verdictClass || 'uncertain')}">${escapeHtml(verdictLabel)}</div>
     <p class="result-meta"><strong>Classification:</strong> ${escapeHtml(classLabel)} · <strong>Confidence:</strong> ${escapeHtml(confLabel)} · <strong>Final suspicion:</strong> ${finalVal}/100</p>
     <p class="result-meta hint">Scale: 0 normal · ~50 suspicious · 75+ very suspicious · 90+ highly abnormal.</p>
     <p><strong>Cheat axis:</strong> ${Math.round(cheatScore)}%</p>
@@ -438,7 +139,7 @@ function displayResult(analysis) {
     <p><strong>Smurf axis:</strong> ${Math.round(smurfScore)}%</p>
     <div class="score-bar"><div class="score-fill smurf" style="width: ${Math.round(smurfScore)}%"></div></div>
     ${
-      reasons.length
+      reasons && reasons.length
         ? `<ul class="reasons">${reasons.map((r) => `<li class="${escapeHtml(r.type || '')}">${escapeHtml(r.text)}</li>`).join('')}</ul>`
         : ''
     }
@@ -510,66 +211,35 @@ resultSection.addEventListener('click', (e) => {
   }
 });
 
-form.addEventListener('submit', function (e) {
+form.addEventListener('submit', async function (e) {
   e.preventDefault();
   hideFormError();
+  resultSection.classList.add('hidden');
 
-  const level = parseInt(document.getElementById('level').value, 10);
-  if (!Number.isFinite(level) || level < MIN_LEVEL_FOR_RANKED) {
+  let input;
+  try {
+    input = readFormPayload();
+  } catch (err) {
+    showFormError(err.message);
+    return;
+  }
+
+  setFormLoading(true);
+  try {
+    const response = await window.R6Api.analyzeProfile(input);
+    const analysis = response.data;
+    pendingSavePayload = buildSavePayload(input, analysis);
+    displayResult(analysis);
+    resultSection.classList.remove('hidden');
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
     showFormError(
-      `Ranked is only available from level ${MIN_LEVEL_FOR_RANKED} in-game. Add a level of ${MIN_LEVEL_FOR_RANKED} or higher, or this ranked profile is not usable here.`
+      err.message ||
+        'Could not analyze the profile. Start the local server with npm run dev or use the deployed app.'
     );
-    resultSection.classList.add('hidden');
-    return;
+  } finally {
+    setFormLoading(false);
   }
-
-  const playedSeasons = getPlayedSeasons();
-  if (playedSeasons.length === 0) {
-    showFormError('Tick at least one ranked season this account has played.');
-    resultSection.classList.add('hidden');
-    return;
-  }
-
-  const kd = parseFloat(document.getElementById('kd').value) || 0;
-  const winrateRaw = document.getElementById('winrate').value;
-  const winrate =
-    winrateRaw === '' ? NaN : parseFloat(winrateRaw);
-  const ranked = parseInt(document.getElementById('ranked').value, 10) || 0;
-  const rankKey = document.getElementById('rank').value;
-  const rankStep = rankKey ? RANK_ORDER[rankKey] || 0 : 0;
-
-  const analysis = analyzeProfile({
-    kd,
-    winrate,
-    ranked,
-    level,
-    rankStep,
-    rankKey,
-    playedSeasons,
-  });
-
-  pendingSavePayload = {
-    pseudo: document.getElementById('pseudo').value.trim() || null,
-    kd,
-    winrate: Number.isNaN(winrate) ? null : winrate,
-    ranked,
-    level,
-    rankKey: rankKey || null,
-    playedSeasons,
-    verdict: analysis.verdict,
-    verdictLabel: analysis.verdictLabel,
-    cheatScore: analysis.cheatScore,
-    smurfScore: analysis.smurfScore,
-    finalScore: analysis.finalScore,
-    confidence: analysis.confidence,
-    classification: analysis.classification,
-    analysis: analysis.analysis,
-    reasons: analysis.reasons,
-  };
-
-  displayResult(analysis);
-  resultSection.classList.remove('hidden');
-  resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 buildSeasonCheckboxes();

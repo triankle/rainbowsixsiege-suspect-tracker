@@ -54,10 +54,12 @@ Sur l'URL Vercel de production :
 4. Tester une entrée pseudo contenant `' OR 1=1--` : l'API doit répondre proprement, sans fuite SQL.
 5. Vérifier les headers sur l'URL prod avec <https://securityheaders.com/>.
 
-## 6. Domaine custom optionnel mais fortement recommandé
+## 6. Domaine, TLS et reverse proxy
 
-1. Demander un sous-domaine gratuit via `is-a.dev` ou `js.org`.
-2. Ajouter le domaine dans Vercel.
-3. Configurer les DNS demandés par Vercel.
-4. Vérifier HTTPS et redirection HTTP vers HTTPS.
-5. Ajouter l'URL custom dans le README.
+URL déployée : `https://suspecttracker-5ykwwx195-rayanpotteratres-7933s-projects.vercel.app/index.html`
+
+1. Vérifier que l'URL s'ouvre en HTTPS sans alerte navigateur.
+2. Vérifier les headers avec <https://securityheaders.com/>.
+3. Vérifier que Vercel sert l'application via son edge network managé.
+4. Expliquer en soutenance que Vercel termine TLS et joue le rôle de reverse proxy/CDN managé.
+5. Option bonus si un vrai domaine personnalisé est demandé : ajouter un domaine dans Vercel, configurer les DNS, puis relancer SSL Labs.

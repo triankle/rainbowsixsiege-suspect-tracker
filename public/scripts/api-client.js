@@ -25,6 +25,15 @@
     return readJsonResponse(response);
   }
 
+  async function analyzeProfile(payload) {
+    const response = await fetch('/api/v1/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return readJsonResponse(response);
+  }
+
   async function listEntries(options = {}) {
     const params = new URLSearchParams();
     if (options.limit) params.set('limit', String(options.limit));
@@ -72,9 +81,19 @@
     return readJsonResponse(response);
   }
 
+  async function logout(token) {
+    const response = await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return readJsonResponse(response);
+  }
+
   global.R6Api = {
+    analyzeProfile,
     buildExportCsvUrl,
     login,
+    logout,
     me,
     saveSubmission,
     listEntries,

@@ -21,3 +21,36 @@ CREATE TABLE IF NOT EXISTS suspect_submissions (
 
 CREATE INDEX IF NOT EXISTS suspect_submissions_created_at_idx
   ON suspect_submissions (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS suspect_submissions_verdict_idx
+  ON suspect_submissions (verdict);
+
+CREATE INDEX IF NOT EXISTS suspect_submissions_rank_key_idx
+  ON suspect_submissions (rank_key);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'UserRole') THEN
+    CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'MODERATOR', 'VIEWER');
+  END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS auth_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  username TEXT NOT NULL UNIQUE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  role "UserRole" NOT NULL DEFAULT 'VIEWER',
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  token_version INTEGER NOT NULL DEFAULT 0,
+  last_login_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS auth_users_role_idx
+  ON auth_users (role);
+
+CREATE INDEX IF NOT EXISTS auth_users_is_active_idx
+  ON auth_users (is_active);
