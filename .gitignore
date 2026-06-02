@@ -7,3 +7,5 @@ node_modules/
 *.log
 out/
 tsconfig.tsbuildinfo
+test-results/
+playwright-report/

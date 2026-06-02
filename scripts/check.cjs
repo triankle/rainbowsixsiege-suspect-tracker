@@ -15,6 +15,7 @@ const commands = [
   ['node', ['-c', 'public/scripts/report-utils.js']],
   ['npm', ['run', 'db:validate']],
   ['npm', ['test']],
+  ['npm', ['run', 'test:e2e']],
   ['npm', ['run', 'lint']],
   ['npm', ['run', 'typecheck']],
   ['npm', ['run', 'vercel-build']],

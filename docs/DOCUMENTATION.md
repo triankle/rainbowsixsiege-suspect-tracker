@@ -29,7 +29,7 @@ Une seule fonction serverless Vercel est utilisée : `api/[...path].js`. Ce choi
 
 1. Le navigateur ouvre `/` ; Next redirige statiquement vers `/index.html`.
 2. Le formulaire dans `public/index.html` collecte K/D, win rate, matchs ranked, niveau, rang et saisons.
-3. Le frontend affiche un premier verdict local pour un retour immédiat.
+3. Le frontend appelle `POST /api/v1/analyze` et affiche le verdict renvoyé par le moteur serveur.
 4. Si l'utilisateur sauvegarde, `POST /api/v1/submissions` valide le body puis recalcule le verdict côté serveur avec `lib/analyze.js`.
 5. Le service crée la ligne via Prisma dans `suspect_submissions`.
 6. `/entries` redirige vers `/entries.html`, qui charge l'historique via `GET /api/v1/entries`.
@@ -97,7 +97,7 @@ npm run vercel-build
 npm run check
 ```
 
-Les tests couvrent le moteur d'analyse, la validation API, l'authentification, le routeur API et le service qui recalcule l'analyse côté serveur.
+Les tests couvrent le moteur d'analyse, la validation API, l'authentification, le routeur API, le service qui recalcule l'analyse côté serveur et un parcours E2E Playwright sur le formulaire principal.
 
 ## Limites assumées
 
@@ -105,4 +105,4 @@ Les tests couvrent le moteur d'analyse, la validation API, l'authentification, l
 - Pas de domaine custom configuré dans le repo.
 - Pas de scraping R6 Tracker.
 - Pas de modèle IA entraîné.
-- Frontend vanilla encore partiellement monolithique.
+- Frontend vanilla encore partiellement monolithique côté rendu, mais l'analyse métier n'est plus dupliquée dans `public/script.js`.

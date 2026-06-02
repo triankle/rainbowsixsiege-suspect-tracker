@@ -84,7 +84,7 @@ graph LR
 
 ### Choix techniques
 
-**HTML/CSS/JavaScript vanilla** : le parcours principal reste très léger et fonctionne sans hydration React complexe. Une SPA React aurait donné une meilleure componentisation, mais aurait augmenté le coût de maintenance pour un MVP centré sur un seul formulaire. L'inconvénient accepté est une modularisation frontend encore limitée.
+**HTML/CSS/JavaScript vanilla** : le parcours principal reste très léger et fonctionne sans hydration React complexe. Une SPA React aurait donné une meilleure componentisation, mais aurait augmenté le coût de maintenance pour un MVP centré sur un seul formulaire. L'inconvénient accepté est une componentisation visuelle encore limitée, compensée par un appel API serveur pour l'analyse.
 
 **Next.js 15 sur Vercel** : Next sert les fichiers statiques, ajoute les headers globaux et permet le déploiement automatique. Une app Express séparée aurait donné plus de contrôle backend, mais aurait demandé un hébergement serveur distinct. L'inconvénient est une architecture hybride entre statique, App Router minimal et fonctions serverless.
 
@@ -98,7 +98,7 @@ graph LR
 
 ### Limites connues
 
-- Le frontend vanilla n'est pas encore découpé en composants réutilisables.
+- Le frontend vanilla n'est pas encore découpé en composants réutilisables, mais il ne duplique plus le moteur d'analyse.
 - La CSP conserve `unsafe-inline` pour rester compatible avec le HTML statique actuel.
 - L'auth JWT est une démonstration admin, pas une gestion complète d'utilisateurs.
 - Le domaine custom et les protections de branches GitHub doivent être configurés manuellement.
@@ -172,15 +172,16 @@ graph LR
 npm run lint
 npm run typecheck
 npm test
+npm run test:e2e
 npm run vercel-build
 npm run check
 ```
 
-`npm run check` vérifie la syntaxe, valide Prisma, exécute les tests Jest, le lint et le build.
+`npm run check` vérifie la syntaxe, valide Prisma, exécute les tests Jest, le test E2E Playwright, le lint, le typecheck et le build.
 
 ## Choix techniques
 
-Le projet privilégie un MVP déployable et défendable : formulaire statique pour la démonstration, API serverless unique pour Vercel Hobby, service métier côté serveur pour recalculer les verdicts, Prisma pour la persistance et Zod pour valider chaque entrée. La logique d'analyse vit dans `lib/analyze.js`, réutilisée par les tests et par `POST /api/v1/submissions`, ce qui évite de faire confiance aux scores envoyés par le client.
+Le projet privilégie un MVP déployable et défendable : formulaire statique pour la démonstration, API serverless unique pour Vercel Hobby, service métier côté serveur pour recalculer les verdicts, Prisma pour la persistance et Zod pour valider chaque entrée. La logique d'analyse vit dans `lib/analyze.js`, réutilisée par les tests, par `POST /api/v1/analyze` et par `POST /api/v1/submissions`, ce qui évite toute divergence entre affichage et sauvegarde.
 
 ## Documentation complémentaire
 

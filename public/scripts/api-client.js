@@ -25,6 +25,15 @@
     return readJsonResponse(response);
   }
 
+  async function analyzeProfile(payload) {
+    const response = await fetch('/api/v1/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return readJsonResponse(response);
+  }
+
   async function listEntries(options = {}) {
     const params = new URLSearchParams();
     if (options.limit) params.set('limit', String(options.limit));
@@ -73,6 +82,7 @@
   }
 
   global.R6Api = {
+    analyzeProfile,
     buildExportCsvUrl,
     login,
     me,
