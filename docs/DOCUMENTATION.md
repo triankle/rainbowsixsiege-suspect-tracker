@@ -25,6 +25,16 @@ graph LR
 
 Une seule fonction serverless Vercel est utilisée : `api/[...path].js`. Ce choix évite de dépasser la limite du plan Hobby.
 
+## Domaine, TLS et reverse proxy
+
+L'application est accessible en HTTPS sur le domaine Vercel managé :
+
+```text
+https://suspecttracker-5ykwwx195-rayanpotteratres-7933s-projects.vercel.app/index.html
+```
+
+Dans cette architecture, Vercel remplace le reverse proxy que l'on configurerait soi-même sur un VPS. Son réseau edge termine TLS, applique la redirection HTTPS sur les domaines `vercel.app`, sert les fichiers statiques via CDN et route les appels API vers la fonction serverless unique `api/[...path].js`. Les headers applicatifs sont définis dans `next.config.ts` et complétés côté API par `lib/api-response.js`.
+
 ## Flux principal
 
 1. Le navigateur ouvre `/` ; Next redirige statiquement vers `/index.html`.
@@ -102,7 +112,7 @@ Les tests couvrent le moteur d'analyse, la validation API, l'authentification, l
 ## Limites assumées
 
 - Pas de compte utilisateur public ni de RBAC complet.
-- Pas de domaine custom configuré dans le repo.
+- Domaine Vercel managé avec TLS automatique ; pas de domaine personnalisé acheté séparément.
 - Pas de scraping R6 Tracker.
 - Pas de modèle IA entraîné.
 - Frontend vanilla encore partiellement monolithique côté rendu, mais l'analyse métier n'est plus dupliquée dans `public/script.js`.

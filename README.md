@@ -6,7 +6,7 @@ R6 Suspect Check aide à analyser un profil Rainbow Six Siege ranked à partir d
 
 ## Démo en ligne
 
-Application déployée : https://suspecttracker-rayanpotteratres-7933s-projects.vercel.app
+Application déployée : https://suspecttracker-5ykwwx195-rayanpotteratres-7933s-projects.vercel.app/index.html
 
 Routes utiles :
 
@@ -96,12 +96,16 @@ graph LR
 
 **Zod** : les bodies et query params sont validés avant toute logique métier. Une validation manuelle aurait réduit les dépendances, mais elle devient vite incohérente entre endpoints. L'inconvénient est un peu de boilerplate de schéma.
 
+### Domaine, TLS et reverse proxy
+
+L'application est publiée sur un domaine Vercel managé : `suspecttracker-5ykwwx195-rayanpotteratres-7933s-projects.vercel.app`. Vercel fournit automatiquement le certificat TLS, force l'accès HTTPS sur le domaine `vercel.app` et place l'application derrière son réseau edge, qui joue le rôle de reverse proxy managé. Ce proxy edge termine TLS, sert les assets statiques via CDN, route les requêtes vers Next.js ou la fonction `api/[...path].js`, et applique les headers définis dans `next.config.ts`. Aucun serveur nginx ou Caddy n'est nécessaire dans ce mode d'hébergement managé.
+
 ### Limites connues
 
 - Le frontend vanilla n'est pas encore découpé en composants réutilisables, mais il ne duplique plus le moteur d'analyse.
 - La CSP conserve `unsafe-inline` pour rester compatible avec le HTML statique actuel.
 - L'auth JWT est une démonstration admin, pas une gestion complète d'utilisateurs.
-- Le domaine custom et les protections de branches GitHub doivent être configurés manuellement.
+- Le domaine est un domaine Vercel managé plutôt qu'un domaine personnalisé acheté séparément.
 - Les heuristiques sont explicables mais ne sont pas un modèle statistique entraîné.
 
 ## Stack
@@ -196,7 +200,7 @@ Le projet privilégie un MVP déployable et défendable : formulaire statique po
 
 ## Limites connues
 
-- Pas de domaine custom configuré dans le repo.
+- Domaine Vercel managé avec TLS automatique ; pas de domaine personnalisé acheté séparément.
 - Pas de compte utilisateur public ni de RBAC complet.
 - Pas d'intégration automatique avec R6 Tracker.
 - Pas de screenshots versionnés pour le moment.
